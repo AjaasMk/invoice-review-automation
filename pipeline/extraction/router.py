@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from pipeline.extraction.client import ExtractionClient
 from pipeline.extraction.confidence import compute_confidence
@@ -32,7 +32,7 @@ def route_and_extract(file_path: str, client: ExtractionClient) -> tuple[dict, s
 
 
 def rasterize_first_page(pdf_path: str) -> bytes:
-    document = fitz.open(pdf_path)
+    document = pymupdf.open(pdf_path)
     try:
         page = document.load_page(0)
         pixmap = page.get_pixmap(dpi=200)

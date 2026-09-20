@@ -37,7 +37,7 @@ def decide(invoice: Invoice, match: MatchResult) -> Decision:
     if match.vendor is not None and match.po is None:
         reason_codes.append("PO_NOT_FOUND")
 
-    if match.po is not None and not match.amount_within_tolerance:
+    if match.po is not None and match.comparison_amount is not None and not match.amount_within_tolerance:
         if match.po.invoiced_to_date > 0:
             reason_codes.append("PO_BALANCE_EXCEEDED")
         else:

@@ -39,7 +39,7 @@ def match_po(
     comparison_amount = _comparison_amount(invoice, best_po)
     remaining_before = best_po.amount - best_po.invoiced_to_date
     tolerance = max(best_po.amount * AMOUNT_TOLERANCE_PCT, AMOUNT_TOLERANCE_MIN)
-    within_tolerance = comparison_amount is not None and abs(comparison_amount - remaining_before) <= tolerance
+    within_tolerance = comparison_amount is not None and comparison_amount <= remaining_before + tolerance
     remaining_after = remaining_before - comparison_amount if comparison_amount is not None else remaining_before
 
     return MatchResult(

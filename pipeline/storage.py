@@ -1,7 +1,9 @@
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
+from typing import Iterator
 
 from pipeline.schemas import Decision, Invoice, PurchaseOrder, VendorRecord
 
@@ -52,10 +54,15 @@ class Repository:
     def __init__(self, db_path: str) -> None:
         self._db_path = db_path
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(self._db_path)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
 
     def init_db(self) -> None:
         with self._connect() as conn:

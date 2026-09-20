@@ -867,7 +867,7 @@ def match_po(
     comparison_amount = _comparison_amount(invoice, best_po)
     remaining_before = best_po.amount - best_po.invoiced_to_date
     tolerance = max(best_po.amount * AMOUNT_TOLERANCE_PCT, AMOUNT_TOLERANCE_MIN)
-    within_tolerance = comparison_amount is not None and abs(comparison_amount - remaining_before) <= tolerance
+    within_tolerance = comparison_amount is not None and comparison_amount <= remaining_before + tolerance
     remaining_after = remaining_before - comparison_amount if comparison_amount is not None else remaining_before
 
     return MatchResult(
@@ -1108,7 +1108,7 @@ def decide(invoice: Invoice, match: MatchResult) -> Decision:
     if match.vendor is not None and match.po is None:
         reason_codes.append("PO_NOT_FOUND")
 
-    if match.po is not None and not match.amount_within_tolerance:
+    if match.po is not None and match.comparison_amount is not None and not match.amount_within_tolerance:
         if match.po.invoiced_to_date > 0:
             reason_codes.append("PO_BALANCE_EXCEEDED")
         else:
@@ -1248,8 +1248,10 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'pipeline.storage'`.
 ```python
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
+from typing import Iterator
 
 from pipeline.schemas import Decision, Invoice, PurchaseOrder, VendorRecord
 
@@ -1300,10 +1302,15 @@ class Repository:
     def __init__(self, db_path: str) -> None:
         self._db_path = db_path
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(self._db_path)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
 
     def init_db(self) -> None:
         with self._connect() as conn:

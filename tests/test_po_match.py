@@ -33,6 +33,14 @@ def test_happy_path_auto_matches_full_amount() -> None:
     assert result.remaining_po_balance == Decimal("0")
 
 
+def test_split_billing_first_partial_invoice_is_within_tolerance_even_though_its_less_than_full_po() -> None:
+    po = PurchaseOrder(po_id="PO-1002", vendor_id="V-GLOBEX", amount=Decimal("10000"), issued_date=date(2026, 8, 5), tax_treatment="exclusive")
+    invoice = _invoice(vendor_name_raw="Globex", po_reference="PO-1002", subtotal=Decimal("6000"), total_amount=Decimal("6000"))
+    result = match_po(invoice, GLOBEX, [po], [])
+    assert result.amount_within_tolerance is True
+    assert result.remaining_po_balance == Decimal("4000")
+
+
 def test_split_billing_second_invoice_compares_to_remaining_balance() -> None:
     po = PurchaseOrder(po_id="PO-1002", vendor_id="V-GLOBEX", amount=Decimal("10000"), issued_date=date(2026, 8, 5), tax_treatment="exclusive", invoiced_to_date=Decimal("6000"))
     invoice = _invoice(vendor_name_raw="Globex", po_reference="PO-1002", subtotal=Decimal("4000"), total_amount=Decimal("4000"))

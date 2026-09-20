@@ -93,6 +93,14 @@ def test_po_balance_exceeded_when_partially_invoiced_already() -> None:
     assert "AMOUNT_OVER_TOLERANCE" not in result.reason_codes
 
 
+def test_no_spurious_amount_code_when_comparison_amount_is_none() -> None:
+    po = PurchaseOrder(po_id="PO-1001", vendor_id="V-ACME", amount=Decimal("5000"), issued_date=date(2026, 8, 1), tax_treatment="exclusive", invoiced_to_date=Decimal("5000"))
+    match = MatchResult(po=po, vendor=ACME, comparison_amount=None, amount_within_tolerance=False)
+    result = decide(_invoice(extraction_confidence=0.2, missing_fields=["total_amount"]), match)
+    assert "AMOUNT_OVER_TOLERANCE" not in result.reason_codes
+    assert "PO_BALANCE_EXCEEDED" not in result.reason_codes
+
+
 def test_reason_codes_accumulate_when_multiple_apply() -> None:
     match = MatchResult(vendor=None, po=None)
     result = decide(_invoice(extraction_confidence=0.2), match)
