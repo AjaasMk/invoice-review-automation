@@ -11,8 +11,10 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env`:
-- `ANTHROPIC_API_KEY` — required for extraction and triage (Claude reads the invoice; it never decides approve/reject).
+Edit `.env` — the model reads the invoice; it never decides approve/reject:
+- `LLM_PROVIDER` — `anthropic` or `nvidia`. Leave blank and it auto-picks whichever API key is set (NVIDIA first if both are present).
+- `ANTHROPIC_API_KEY` — for the Claude-backed clients.
+- `NVIDIA_API_KEY` + `NVIDIA_MODEL` — for the free NVIDIA `integrate.api.nvidia.com` endpoint (OpenAI-compatible). `NVIDIA_MODEL` defaults to `moonshotai/kimi-k3`, but that model was hanging indefinitely on non-streaming calls as of this build (confirmed: valid model, working key, other models on the same account respond in under a second) — `meta/llama-3.2-11b-vision-instruct` is the confirmed-working fallback and is what's actually configured right now. Swap `NVIDIA_MODEL` back once kimi-k3 recovers.
 - `GMAIL_IMAP_USER` / `GMAIL_IMAP_APP_PASSWORD` — optional. Leave blank to run on folder/upload intake only. If set, needs a Gmail [App Password](https://myaccount.google.com/apppasswords) (requires 2-Step Verification), not the account password.
 
 Generate the test fixtures (happy path + all 4 edge cases) if `data/invoices/` is empty:
@@ -26,6 +28,8 @@ python -m data.generate_fixtures
 ```bash
 python -m web.server
 ```
+
+No API key handy? `python preview_server.py` runs the same UI on fake extraction/triage clients (port 8123) so you can check layout and flow without spending a real call.
 
 Open `http://localhost:8000`. Three tabs:
 - **Gate** — drag an invoice in (or drop a file into `runs/inbox/`, or send one to the configured Gmail inbox if IMAP is on) and approve/reject it.
@@ -70,3 +74,4 @@ FastAPI serves the UI and API over SSE. LangGraph orchestrates the pipeline as a
 - "Approved vendor" is a boolean flag on the vendor master; no external verification.
 - `AnthropicExtractionClient`/`AnthropicTriageClient`/`RealImapClient` are not covered by the automated test suite — they need live credentials. See the manual smoke-test commands in the design spec (§ extraction, § IMAP) to exercise them directly.
 - Amount tolerance, duplicate detection window, and confidence floor are illustrative defaults in `pipeline/config.py`, not derived from real historical data — callable out live if asked.
+- Real-model testing surfaced something worth knowing going in: a vision model shown a genuinely illegible scan doesn't reliably self-report low confidence — it can fabricate a complete, plausible-looking invoice instead of admitting it can't read one. `EXTRACTION_INSTRUCTIONS` explicitly forbids this now, and `parse_json_response` degrades to an all-null result (rather than crashing) when a model abstains in prose instead of JSON — but this is a real, ongoing model-behavior risk worth stating plainly, not a solved problem.

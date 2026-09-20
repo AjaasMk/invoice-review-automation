@@ -3,42 +3,110 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Invoice Decision Pipeline</title>
+<title>Ledger — an AI employee for accounts payable</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,700,500,400&f[]=switzer@400,500,600,700&display=swap">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<header class="topbar">
-  <h1>Invoice Decision Pipeline</h1>
-  <nav class="tabs">
-    <button class="tab-button active" data-tab="gate">Gate</button>
-    <button class="tab-button" data-tab="live">Live Run</button>
-    <button class="tab-button" data-tab="dashboard">Dashboard</button>
+<div class="glitch-field" aria-hidden="true">
+  <div class="glitch-blob blob-a"></div>
+  <div class="glitch-blob blob-b"></div>
+  <div class="glitch-blob blob-c"></div>
+  <div class="glitch-noise"></div>
+  <div class="glitch-scan"></div>
+</div>
+
+<header class="masthead">
+  <div class="topbar">
+    <div class="logo-mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="26" height="26">
+        <rect x="2" y="2" width="12" height="12" fill="currentColor"/>
+        <rect x="18" y="2" width="12" height="12" fill="currentColor" opacity="0.35"/>
+        <rect x="2" y="18" width="12" height="12" fill="currentColor" opacity="0.35"/>
+        <rect x="18" y="18" width="12" height="12" fill="currentColor"/>
+      </svg>
+      <span>ledger.ai</span>
+    </div>
+    <div class="status-chip" id="status-chip">
+      <span class="status-dot"></span>
+      <span id="status-text">Ledger is idle</span>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1 class="wordmark">ledger</h1>
+    <p class="hero-line">Hi — I'm Ledger, an AI employee for accounts payable.<br>Show me an invoice and I'll extract it, match it to a PO, and tell you exactly why.</p>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab-button active" data-tab="gate" role="tab" aria-selected="true">Intake</button>
+    <button class="tab-button" data-tab="live" role="tab" aria-selected="false">Live Run</button>
+    <button class="tab-button" data-tab="dashboard" role="tab" aria-selected="false">Ledger</button>
   </nav>
 </header>
+
 <main>
   <section id="tab-gate" class="tab-panel active">
-    <div class="upload-box">
-      <span class="upload-label">Drop an invoice here or click to upload</span>
+    <div class="section-head">
+      <h2>What's in the tray</h2>
+      <p class="section-note">Nothing moves past this point without a human saying so.</p>
+    </div>
+
+    <div class="upload-box" tabindex="0">
+      <svg class="upload-icon" viewBox="0 0 48 48" width="26" height="26" aria-hidden="true">
+        <path d="M24 6 L24 30 M14 18 L24 6 L34 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8 34 L8 40 Q8 42 10 42 L38 42 Q40 42 40 40 L40 34" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="upload-label">Drop an invoice, or click to select</span>
+      <span class="upload-sub">PDF · PNG · JPG</span>
       <input id="upload-input" type="file" accept=".pdf,.png,.jpg,.jpeg">
     </div>
+
     <div id="gate-list" class="card-list"></div>
+    <p id="gate-empty" class="empty-state">Tray's empty. I'm caught up.</p>
   </section>
+
   <section id="tab-live" class="tab-panel">
-    <div class="live-controls">
-      <label for="run-select">Run:</label>
-      <select id="run-select"></select>
+    <div class="section-head">
+      <h2>What I'm doing right now</h2>
+      <p class="section-note">Every stage, as I work through it.</p>
     </div>
+
+    <div class="live-controls">
+      <label for="run-select">Watching</label>
+      <select id="run-select"></select>
+      <span class="live-indicator" id="live-indicator"><span class="live-dot"></span>live</span>
+    </div>
+
     <ol id="stage-timeline" class="stage-timeline"></ol>
+    <p id="live-empty" class="empty-state">Nothing to watch yet — approve something from Intake.</p>
   </section>
+
   <section id="tab-dashboard" class="tab-panel">
+    <div class="section-head">
+      <h2>Everything I've decided</h2>
+      <p class="section-note">Every run, every outcome, and my reasoning for it.</p>
+    </div>
+
     <table id="runs-table" class="runs-table">
       <thead>
-        <tr><th>Run</th><th>Status</th><th>Decision</th><th>Reasons</th><th>Updated</th></tr>
+        <tr>
+          <th>Run</th>
+          <th>Status</th>
+          <th>Decision</th>
+          <th>Reasoning</th>
+          <th>Updated</th>
+        </tr>
       </thead>
       <tbody></tbody>
     </table>
+    <p id="dashboard-empty" class="empty-state">No history yet — this fills in as I work.</p>
   </section>
 </main>
+
 <script src="/app.js"></script>
 </body>
 </html>
