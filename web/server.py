@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, UploadFile
@@ -28,8 +29,6 @@ def create_app(
     imap_source: ImapSource | None = None,
     poll_interval_seconds: float = 5.0,
 ) -> FastAPI:
-    app = FastAPI()
-
     async def run_resume_safely(run_id: str, approved: bool) -> None:
         try:
             await asyncio.to_thread(resume_run, app.state.graph, run_id, approved)
@@ -57,16 +56,16 @@ def create_app(
                 logger.exception(f"intake poll loop failed: {exc}")
             await asyncio.sleep(poll_interval_seconds)
 
-    @app.on_event("startup")
-    async def startup() -> None:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
         loop = asyncio.get_running_loop()
         app.state.bus = EventBus(loop)
         app.state.graph = build_graph(repo, extraction_client, triage_client, checkpoint_db_path, on_stage=app.state.bus.publish)
         app.state.poll_task = asyncio.create_task(poll_loop())
-
-    @app.on_event("shutdown")
-    async def shutdown() -> None:
+        yield
         app.state.poll_task.cancel()
+
+    app = FastAPI(lifespan=lifespan)
 
     @app.post("/api/upload")
     async def upload(file: UploadFile) -> dict:
