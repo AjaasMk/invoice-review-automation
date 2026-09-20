@@ -1,0 +1,47 @@
+[
+  {
+    "po_id": "PO-1001",
+    "vendor_id": "V-ACME",
+    "amount": "5000.00",
+    "currency": "USD",
+    "issued_date": "2026-08-01",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1002",
+    "vendor_id": "V-GLOBEX",
+    "amount": "10000.00",
+    "currency": "USD",
+    "issued_date": "2026-08-05",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1003",
+    "vendor_id": "V-ACME",
+    "amount": "3000.00",
+    "currency": "USD",
+    "issued_date": "2026-08-10",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1004",
+    "vendor_id": "V-ACME",
+    "amount": "2000.00",
+    "currency": "USD",
+    "issued_date": "2026-08-12",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1005",
+    "vendor_id": "V-ACME",
+    "amount": "1500.00",
+    "currency": "USD",
+    "issued_date": "2026-08-15",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  }
+]

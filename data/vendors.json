@@ -1,0 +1,20 @@
+[
+  {
+    "vendor_id": "V-ACME",
+    "canonical_name": "Acme Corporation Pvt Ltd",
+    "aliases": ["Acme Corp", "ACME CORP.", "Acme Corporation"],
+    "approved": true
+  },
+  {
+    "vendor_id": "V-GLOBEX",
+    "canonical_name": "Globex Industries LLC",
+    "aliases": ["Globex Industries", "Globex"],
+    "approved": true
+  },
+  {
+    "vendor_id": "V-INITECH",
+    "canonical_name": "Initech Solutions Inc",
+    "aliases": ["Initech", "Initech Solutions"],
+    "approved": false
+  }
+]
