@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+langgraph
+langgraph-checkpoint-sqlite
+pydantic>=2
+pdfplumber
+reportlab
+Pillow
+anthropic
+rapidfuzz
+python-dotenv
+pytest
+httpx
+pymupdf
