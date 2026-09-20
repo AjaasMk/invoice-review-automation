@@ -117,3 +117,63 @@ def create_app(
 
     app.mount("/", StaticFiles(directory="web/static", html=True), name="static")
     return app
+
+
+def _load_reference_data(repo: Repository) -> None:
+    from pathlib import Path
+
+    from pipeline.schemas import PurchaseOrder, VendorRecord
+
+    data_dir = Path(__file__).resolve().parent.parent / "data"
+    vendors = [VendorRecord.model_validate(v) for v in json.loads((data_dir / "vendors.json").read_text())]
+    purchase_orders = [PurchaseOrder.model_validate(p) for p in json.loads((data_dir / "purchase_orders.json").read_text())]
+    repo.seed_reference_data(vendors, purchase_orders)
+
+
+def _build_real_app() -> FastAPI:
+    import os
+
+    from dotenv import load_dotenv
+
+    from pipeline.extraction.vision import AnthropicExtractionClient
+    from pipeline.triage import AnthropicTriageClient
+
+    load_dotenv()
+
+    repo = Repository("runs/app.db")
+    repo.init_db()
+    _load_reference_data(repo)
+
+    folder_source = FolderSource("runs/inbox", "runs/intake_storage")
+    upload_source = UploadSource("runs/uploads")
+
+    imap_source = None
+    imap_user = os.environ.get("GMAIL_IMAP_USER")
+    imap_password = os.environ.get("GMAIL_IMAP_APP_PASSWORD")
+    if imap_user and imap_password:
+        from pipeline.intake.imap_source import RealImapClient
+
+        imap_host = os.environ.get("GMAIL_IMAP_HOST", "imap.gmail.com")
+        imap_client = RealImapClient(imap_host, imap_user, imap_password)
+        imap_source = ImapSource(imap_client, "runs/intake_storage")
+        logger.info(f"IMAP polling enabled for {imap_user}@{imap_host}")
+    else:
+        logger.info("IMAP polling disabled (GMAIL_IMAP_USER/GMAIL_IMAP_APP_PASSWORD not set) — use folder/upload intake")
+
+    return create_app(
+        repo,
+        AnthropicExtractionClient(),
+        AnthropicTriageClient(),
+        folder_source,
+        upload_source,
+        "runs/checkpoints.db",
+        imap_source=imap_source,
+        poll_interval_seconds=5.0,
+    )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    logging.basicConfig(level=logging.INFO)
+    uvicorn.run(_build_real_app(), host="0.0.0.0", port=8000)
