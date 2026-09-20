@@ -45,6 +45,8 @@ python -m evals.run_evals           # structured JSON pass/fail across happy pat
 
 `run_evals` exits 0 only if every case matches its expected outcome and reason codes exactly — this is the regression gate, not just the unit tests.
 
+`python live_smoke_test.py` runs the same 7 cases against your *real* configured model (costs real API calls) instead of canned responses — the thing to re-run after any change to the extraction prompt, a model swap, or before the interview, to confirm real model behavior still lands on the right decisions.
+
 ## Rerun any stage in isolation
 
 Every stage's output is persisted per run. To re-evaluate just the matching or decision logic after a rule/config change, without re-running extraction (no repeat API cost):
