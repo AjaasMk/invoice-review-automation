@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice Decision Pipeline</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>Invoice Decision Pipeline</h1>
+  <nav class="tabs">
+    <button class="tab-button active" data-tab="gate">Gate</button>
+    <button class="tab-button" data-tab="live">Live Run</button>
+    <button class="tab-button" data-tab="dashboard">Dashboard</button>
+  </nav>
+</header>
+<main>
+  <section id="tab-gate" class="tab-panel active">
+    <div class="upload-box">
+      <span class="upload-label">Drop an invoice here or click to upload</span>
+      <input id="upload-input" type="file" accept=".pdf,.png,.jpg,.jpeg">
+    </div>
+    <div id="gate-list" class="card-list"></div>
+  </section>
+  <section id="tab-live" class="tab-panel">
+    <div class="live-controls">
+      <label for="run-select">Run:</label>
+      <select id="run-select"></select>
+    </div>
+    <ol id="stage-timeline" class="stage-timeline"></ol>
+  </section>
+  <section id="tab-dashboard" class="tab-panel">
+    <table id="runs-table" class="runs-table">
+      <thead>
+        <tr><th>Run</th><th>Status</th><th>Decision</th><th>Reasons</th><th>Updated</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
