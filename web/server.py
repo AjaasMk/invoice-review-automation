@@ -130,15 +130,42 @@ def _load_reference_data(repo: Repository) -> None:
     repo.seed_reference_data(vendors, purchase_orders)
 
 
+def _build_llm_clients() -> tuple[object, object]:
+    import os
+
+    from pipeline.extraction.vision import AnthropicExtractionClient, NvidiaExtractionClient
+    from pipeline.triage import AnthropicTriageClient, NvidiaTriageClient
+
+    provider = os.environ.get("LLM_PROVIDER", "").strip().lower()
+    if not provider:
+        if os.environ.get("NVIDIA_API_KEY"):
+            provider = "nvidia"
+        elif os.environ.get("ANTHROPIC_API_KEY"):
+            provider = "anthropic"
+        else:
+            raise ValueError("set NVIDIA_API_KEY or ANTHROPIC_API_KEY in .env (or LLM_PROVIDER explicitly) before running")
+
+    if provider == "nvidia":
+        model = os.environ.get("NVIDIA_MODEL") or None
+        kwargs = {"model": model} if model else {}
+        logger.info(f"LLM provider: nvidia (model={model or 'default'})")
+        return NvidiaExtractionClient(**kwargs), NvidiaTriageClient(**kwargs)
+
+    if provider == "anthropic":
+        logger.info("LLM provider: anthropic")
+        return AnthropicExtractionClient(), AnthropicTriageClient()
+
+    raise ValueError(f"unknown LLM_PROVIDER '{provider}'; use 'nvidia' or 'anthropic'")
+
+
 def _build_real_app() -> FastAPI:
     import os
 
     from dotenv import load_dotenv
 
-    from pipeline.extraction.vision import AnthropicExtractionClient
-    from pipeline.triage import AnthropicTriageClient
-
     load_dotenv()
+
+    extraction_client, triage_client = _build_llm_clients()
 
     repo = Repository("runs/app.db")
     repo.init_db()
@@ -162,8 +189,8 @@ def _build_real_app() -> FastAPI:
 
     return create_app(
         repo,
-        AnthropicExtractionClient(),
-        AnthropicTriageClient(),
+        extraction_client,
+        triage_client,
         folder_source,
         upload_source,
         "runs/checkpoints.db",

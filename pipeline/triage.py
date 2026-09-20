@@ -5,6 +5,7 @@ from typing import Protocol
 
 from anthropic import Anthropic
 
+from pipeline.extraction import nvidia_client
 from pipeline.extraction.json_parsing import parse_json_response
 from pipeline.extraction.pdf_text import extract_raw_text, has_text_layer
 from pipeline.extraction.router import rasterize_first_page
@@ -19,6 +20,12 @@ TRIAGE_INSTRUCTIONS = (
 )
 
 IMAGE_MEDIA_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+
+UNCERTAIN_TRIAGE_RESULT = {
+    "looks_like_invoice": True,
+    "preview_text": "Could not analyze this document automatically — needs a manual look.",
+    "reason": "the model did not return a structured triage result",
+}
 
 
 class TriageClient(Protocol):
@@ -59,7 +66,7 @@ class AnthropicTriageClient:
             max_tokens=512,
             messages=[{"role": "user", "content": f"{TRIAGE_INSTRUCTIONS}\n\nDocument text:\n{text}"}],
         )
-        return parse_json_response(text_from_response(response))
+        return parse_json_response(text_from_response(response), fallback=UNCERTAIN_TRIAGE_RESULT)
 
     def triage_image(self, image_bytes: bytes, media_type: str) -> dict:
         encoded = base64.standard_b64encode(image_bytes).decode("utf-8")
@@ -76,4 +83,20 @@ class AnthropicTriageClient:
                 }
             ],
         )
-        return parse_json_response(text_from_response(response))
+        return parse_json_response(text_from_response(response), fallback=UNCERTAIN_TRIAGE_RESULT)
+
+
+class NvidiaTriageClient:
+    def __init__(self, api_key: str | None = None, model: str = nvidia_client.DEFAULT_NVIDIA_MODEL) -> None:
+        self._api_key = api_key
+        self._model = model
+
+    def triage_text(self, text: str) -> dict:
+        content = nvidia_client.build_text_message(TRIAGE_INSTRUCTIONS, text)
+        raw_text = nvidia_client.call_nvidia_chat(content, self._model, self._api_key)
+        return parse_json_response(raw_text, fallback=UNCERTAIN_TRIAGE_RESULT)
+
+    def triage_image(self, image_bytes: bytes, media_type: str) -> dict:
+        content = nvidia_client.build_image_message(TRIAGE_INSTRUCTIONS, image_bytes, media_type)
+        raw_text = nvidia_client.call_nvidia_chat(content, self._model, self._api_key)
+        return parse_json_response(raw_text, fallback=UNCERTAIN_TRIAGE_RESULT)

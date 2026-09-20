@@ -8,6 +8,7 @@ reportlab
 Pillow
 anthropic
 rapidfuzz
+requests
 python-dotenv
 pytest
 httpx
