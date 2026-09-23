@@ -32,4 +32,4 @@ Use any Docker-capable host and configure:
 
 After deployment, run one happy-path upload and one degraded-scan upload against the public URL before recording or submitting it. Do not seed the production demo database with prior runs unless those runs are intentionally part of the dashboard story.
 
-DeepSeek has not yet been live-verified with this pipeline. If it is unavailable during a demo, the existing NVIDIA path remains available: set `LLM_PROVIDER=nvidia`, `NVIDIA_API_KEY`, and `NVIDIA_MODEL=meta/llama-3.2-11b-vision-instruct`. That fallback completed the repository's seven-case live smoke suite on 2026-09-21.
+The deployed application uses DeepSeek for extraction only. Validation, vendor/PO matching, duplicate checks, and approval decisions remain deterministic application logic.

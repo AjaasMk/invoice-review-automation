@@ -6,7 +6,7 @@ Design rationale and architecture: [`docs/superpowers/specs/2026-09-20-invoice-d
 
 ## Current status
 
-- **Application:** FastAPI service with a responsive review workspace, live stage updates, run history, vendor/PO database view, and a development-only reset control.
+- **Application:** FastAPI service with a responsive review workspace, live stage updates, run history, vendor/PO database view, and a development-only reset control. Invoice extraction is configured for DeepSeek.
 - **Intake:** Manual upload, watched-folder intake, and Gmail IMAP intake are implemented. Gmail processing is deliberately restricted to messages labelled `Invoice Review Queue`; an employee applies that label before the system reads the attachment.
 - **Controls:** Structured extraction is separated from deterministic validation, vendor/PO matching, cumulative PO-balance checks, and duplicate detection. Exact file duplicates are stopped before model processing; content-level duplicates are routed to review with an explanation.
 - **Demo data:** Five vendors, twenty purchase orders, regression fixtures, and three DB-matched demo invoices are included.
@@ -23,11 +23,10 @@ cp .env.example .env
 
 On Windows PowerShell, use `Copy-Item .env.example .env` for the second command.
 
-Edit `.env` — the model reads the invoice; it never decides approve/reject:
-- `LLM_PROVIDER` — `deepseek`, `nvidia`, or `anthropic`. Leave blank and it auto-picks an available key (DeepSeek first, then NVIDIA, then Anthropic).
-- `DEEPSEEK_API_KEY` + `DEEPSEEK_MODEL` — for DeepSeek's Chat Completions endpoint. `deepseek-flash` handles text PDFs and rendered scanned/image invoices. Add the key locally before switching `LLM_PROVIDER=deepseek`.
-- `ANTHROPIC_API_KEY` — for the Claude-backed clients.
-- `NVIDIA_API_KEY` + `NVIDIA_MODEL` — optional fallback using NVIDIA's OpenAI-compatible endpoint at `integrate.api.nvidia.com`.
+Edit `.env` — the DeepSeek model reads the invoice; it never decides approve/reject:
+- `LLM_PROVIDER=deepseek`
+- `DEEPSEEK_API_KEY` — your DeepSeek API key.
+- `DEEPSEEK_MODEL=deepseek-flash` — used for text PDFs and rendered scanned/image invoices.
 - `GMAIL_IMAP_USER` / `GMAIL_IMAP_APP_PASSWORD` — optional. Leave blank to run on folder/upload intake only. If set, needs a Gmail [App Password](https://myaccount.google.com/apppasswords) (requires 2-Step Verification), not the account password.
 - `GMAIL_IMAP_MAILBOX` — defaults to `INBOX`. For the review workflow, create a Gmail label named `Invoice Review Queue`, set this value to that exact label name, and have an employee apply it to invoice mail. The app polls only that label, including messages that have already been read.
 
@@ -100,8 +99,8 @@ Every incoming attachment also receives a SHA-256 fingerprint. An exact re-uploa
 - Test data (vendors, POs, invoices) is generated, not real — per the case study's own guidance.
 - Single currency (USD) across all fixtures; no multi-currency conversion.
 - "Approved vendor" is a boolean flag on the vendor master; no external verification.
-- `AnthropicExtractionClient`/`AnthropicTriageClient`/`RealImapClient` are not covered by the automated test suite — they need live credentials. See the manual smoke-test commands in the design spec (§ extraction, § IMAP) to exercise them directly.
+- `RealImapClient` is not covered by the automated test suite because it requires live Gmail credentials. Use the configured review label for a manual intake check before recording the demo.
 - Amount tolerance, duplicate detection window, and confidence floor are illustrative defaults in `pipeline/config.py`, not derived from real historical data — callable out live if asked.
 - Real-model testing surfaced something worth knowing going in: a vision model shown a genuinely illegible scan doesn't reliably self-report low confidence — it can fabricate a complete, plausible-looking invoice instead of admitting it can't read one. `EXTRACTION_INSTRUCTIONS` explicitly forbids this now, and `parse_json_response` degrades to an all-null result (rather than crashing) when a model abstains in prose instead of JSON — but this is a real, ongoing model-behavior risk worth stating plainly, not a solved problem.
 - `extraction_confidence` is a conservative completeness heuristic over critical fields, not a calibrated probability from the model.
-- On 2026-09-21, the full live suite passed 7/7 through NVIDIA with `meta/llama-3.2-11b-vision-instruct`. The `moonshotai/kimi-k3` configuration remained non-responsive during a multi-minute verification attempt. DeepSeek support is prepared but must pass the same live suite once a key is available.
+- Run `python live_smoke_test.py` with the configured DeepSeek key before recording. It makes real model calls and is the final check that the extraction provider is behaving as expected.
