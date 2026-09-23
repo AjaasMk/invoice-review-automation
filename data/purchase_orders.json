@@ -43,5 +43,140 @@
     "issued_date": "2026-08-15",
     "tax_treatment": "exclusive",
     "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1006",
+    "vendor_id": "V-ACME",
+    "amount": "8500.00",
+    "currency": "USD",
+    "issued_date": "2026-08-18",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1007",
+    "vendor_id": "V-ACME",
+    "amount": "12000.00",
+    "currency": "USD",
+    "issued_date": "2026-08-22",
+    "tax_treatment": "inclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1008",
+    "vendor_id": "V-GLOBEX",
+    "amount": "4500.00",
+    "currency": "USD",
+    "issued_date": "2026-08-20",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1009",
+    "vendor_id": "V-GLOBEX",
+    "amount": "7200.00",
+    "currency": "USD",
+    "issued_date": "2026-08-24",
+    "tax_treatment": "inclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1010",
+    "vendor_id": "V-GLOBEX",
+    "amount": "13000.00",
+    "currency": "USD",
+    "issued_date": "2026-08-28",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1011",
+    "vendor_id": "V-GLOBEX",
+    "amount": "2800.00",
+    "currency": "USD",
+    "issued_date": "2026-09-01",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1012",
+    "vendor_id": "V-INITECH",
+    "amount": "6000.00",
+    "currency": "USD",
+    "issued_date": "2026-08-25",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1013",
+    "vendor_id": "V-INITECH",
+    "amount": "2400.00",
+    "currency": "USD",
+    "issued_date": "2026-09-03",
+    "tax_treatment": "inclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1014",
+    "vendor_id": "V-NORTHSTAR",
+    "amount": "950.00",
+    "currency": "USD",
+    "issued_date": "2026-09-02",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1015",
+    "vendor_id": "V-NORTHSTAR",
+    "amount": "4200.00",
+    "currency": "USD",
+    "issued_date": "2026-09-05",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1016",
+    "vendor_id": "V-NORTHSTAR",
+    "amount": "1800.00",
+    "currency": "USD",
+    "issued_date": "2026-09-08",
+    "tax_treatment": "inclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1017",
+    "vendor_id": "V-NORTHSTAR",
+    "amount": "11000.00",
+    "currency": "USD",
+    "issued_date": "2026-09-10",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1018",
+    "vendor_id": "V-APEX",
+    "amount": "15500.00",
+    "currency": "USD",
+    "issued_date": "2026-09-04",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1019",
+    "vendor_id": "V-APEX",
+    "amount": "3200.00",
+    "currency": "USD",
+    "issued_date": "2026-09-11",
+    "tax_treatment": "inclusive",
+    "invoiced_to_date": "0"
+  },
+  {
+    "po_id": "PO-1020",
+    "vendor_id": "V-APEX",
+    "amount": "7800.00",
+    "currency": "USD",
+    "issued_date": "2026-09-15",
+    "tax_treatment": "exclusive",
+    "invoiced_to_date": "0"
   }
 ]

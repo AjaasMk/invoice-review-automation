@@ -1,4 +1,6 @@
 .env
+*.env
+!.env.example
 __pycache__/
 *.pyc
 .venv/
@@ -8,3 +10,6 @@ runs/*
 *.db
 .pytest_cache/
 node_modules/
+tmp/
+test-tmp/
+output/

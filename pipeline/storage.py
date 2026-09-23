@@ -1,8 +1,10 @@
 import json
 import sqlite3
+from hashlib import sha256
 from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from typing import Iterator
 
 from pipeline.schemas import Decision, Invoice, PurchaseOrder, VendorRecord
@@ -26,6 +28,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
 CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY,
     doc_id TEXT NOT NULL,
+    content_sha256 TEXT,
     status TEXT NOT NULL,
     decision_json TEXT,
     created_at TEXT NOT NULL,
@@ -47,6 +50,12 @@ CREATE TABLE IF NOT EXISTS invoice_records (
     total_amount TEXT,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS email_intake_records (
+    message_key TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (message_key, content_sha256)
+);
 """
 
 
@@ -67,6 +76,11 @@ class Repository:
     def init_db(self) -> None:
         with self._connect() as conn:
             conn.executescript(SCHEMA)
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
+            if "content_sha256" not in columns:
+                conn.execute("ALTER TABLE runs ADD COLUMN content_sha256 TEXT")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_content_sha256 ON runs(content_sha256)")
+            self._backfill_content_hashes(conn)
 
     def seed_reference_data(self, vendors: list[VendorRecord], purchase_orders: list[PurchaseOrder]) -> None:
         with self._connect() as conn:
@@ -77,7 +91,16 @@ class Repository:
                 )
             for po in purchase_orders:
                 conn.execute(
-                    "INSERT OR REPLACE INTO purchase_orders (po_id, vendor_id, amount, currency, issued_date, tax_treatment, invoiced_to_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    """
+                    INSERT INTO purchase_orders (po_id, vendor_id, amount, currency, issued_date, tax_treatment, invoiced_to_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(po_id) DO UPDATE SET
+                        vendor_id = excluded.vendor_id,
+                        amount = excluded.amount,
+                        currency = excluded.currency,
+                        issued_date = excluded.issued_date,
+                        tax_treatment = excluded.tax_treatment
+                    """,
                     (po.po_id, po.vendor_id, str(po.amount), po.currency, po.issued_date.isoformat(), po.tax_treatment, str(po.invoiced_to_date)),
                 )
 
@@ -114,13 +137,72 @@ class Repository:
         with self._connect() as conn:
             conn.execute("UPDATE purchase_orders SET invoiced_to_date = ? WHERE po_id = ?", (str(new_invoiced_to_date), po_id))
 
-    def create_run(self, run_id: str, doc_id: str, status: str) -> None:
+    def update_po_balance_if_current(
+        self,
+        po_id: str,
+        expected_invoiced_to_date: Decimal,
+        new_invoiced_to_date: Decimal,
+    ) -> bool:
+        """Atomically update a PO only if another run has not changed its balance."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE purchase_orders SET invoiced_to_date = ? WHERE po_id = ? AND invoiced_to_date = ?",
+                (str(new_invoiced_to_date), po_id, str(expected_invoiced_to_date)),
+            )
+            return cursor.rowcount == 1
+
+    def create_run(self, run_id: str, doc_id: str, status: str, content_sha256: str | None = None) -> None:
         with self._connect() as conn:
             now = _now_iso()
             conn.execute(
-                "INSERT INTO runs (run_id, doc_id, status, decision_json, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?)",
-                (run_id, doc_id, status, now, now),
+                "INSERT INTO runs (run_id, doc_id, content_sha256, status, decision_json, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, ?, ?)",
+                (run_id, doc_id, content_sha256, status, now, now),
             )
+
+    def find_prior_run_by_content_hash(self, content_sha256: str | None, exclude_run_id: str) -> dict | None:
+        """Find a completed earlier run for an identical attachment, if any."""
+        if not content_sha256:
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT run_id, status, decision_json, created_at
+                FROM runs
+                WHERE content_sha256 = ? AND run_id != ? AND decision_json IS NOT NULL
+                ORDER BY created_at ASC
+                LIMIT 1
+                """,
+                (content_sha256, exclude_run_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "run_id": row["run_id"],
+            "status": row["status"],
+            "decision": json.loads(row["decision_json"]),
+            "created_at": row["created_at"],
+        }
+
+    def reset_demo_state(self) -> dict[str, int]:
+        """Clear processing history while retaining vendors and PO master data."""
+        with self._connect() as conn:
+            run_count = conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+            invoice_count = conn.execute("SELECT COUNT(*) FROM invoice_records").fetchone()[0]
+            conn.execute("DELETE FROM run_stages")
+            conn.execute("DELETE FROM invoice_records")
+            conn.execute("DELETE FROM email_intake_records")
+            conn.execute("DELETE FROM runs")
+            conn.execute("UPDATE purchase_orders SET invoiced_to_date = '0'")
+        return {"runs_cleared": run_count, "invoice_records_cleared": invoice_count}
+
+    def claim_email_attachment(self, message_key: str, content_sha256: str) -> bool:
+        """Record an email attachment once; False means it was already imported."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "INSERT OR IGNORE INTO email_intake_records (message_key, content_sha256, created_at) VALUES (?, ?, ?)",
+                (message_key, content_sha256, _now_iso()),
+            )
+            return cursor.rowcount == 1
 
     def update_run_status(self, run_id: str, status: str) -> None:
         with self._connect() as conn:
@@ -154,15 +236,15 @@ class Repository:
     def list_runs(self) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM runs ORDER BY created_at DESC").fetchall()
-        return [self._run_row_to_dict(row) for row in rows]
+            return [self._run_row_to_dict(row, conn) for row in rows]
 
     def get_run(self, run_id: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
-        return self._run_row_to_dict(row) if row is not None else None
+            return self._run_row_to_dict(row, conn) if row is not None else None
 
-    def _run_row_to_dict(self, row: sqlite3.Row) -> dict:
-        return {
+    def _run_row_to_dict(self, row: sqlite3.Row, conn: sqlite3.Connection) -> dict:
+        result = {
             "run_id": row["run_id"],
             "doc_id": row["doc_id"],
             "status": row["status"],
@@ -170,6 +252,26 @@ class Repository:
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }
+        for stage_name in ("intake", "validate"):
+            stage_row = conn.execute(
+                "SELECT payload_json FROM run_stages WHERE run_id = ? AND stage = ? ORDER BY seq DESC LIMIT 1",
+                (row["run_id"], stage_name),
+            ).fetchone()
+            if stage_row is None:
+                continue
+            payload = json.loads(stage_row["payload_json"])
+            if stage_name == "intake":
+                result["filename"] = payload.get("filename")
+                result["source"] = payload.get("source")
+            else:
+                result["po_reference"] = payload.get("po_reference")
+                result["invoice"] = {
+                    "invoice_number": payload.get("invoice_number"),
+                    "vendor_name": payload.get("vendor_name_raw"),
+                    "total_amount": payload.get("total_amount"),
+                    "currency": payload.get("currency"),
+                }
+        return result
 
     def save_invoice_record(self, run_id: str, vendor_id: str, invoice: Invoice) -> None:
         with self._connect() as conn:
@@ -202,6 +304,26 @@ class Repository:
             )
             for row in rows
         ]
+
+    def _backfill_content_hashes(self, conn: sqlite3.Connection) -> None:
+        """Add fingerprints to historical runs so duplicate checks survive an upgrade."""
+        rows = conn.execute(
+            """
+            SELECT runs.run_id, run_stages.payload_json
+            FROM runs
+            JOIN run_stages ON run_stages.run_id = runs.run_id AND run_stages.stage = 'intake'
+            WHERE runs.content_sha256 IS NULL
+            """
+        ).fetchall()
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            fingerprint = payload.get("content_sha256")
+            if not fingerprint:
+                try:
+                    fingerprint = sha256(Path(payload["content_path"]).read_bytes()).hexdigest()
+                except (KeyError, OSError):
+                    continue
+            conn.execute("UPDATE runs SET content_sha256 = ? WHERE run_id = ?", (fingerprint, row["run_id"]))
 
 
 def _now_iso() -> str:

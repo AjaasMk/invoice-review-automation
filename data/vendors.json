@@ -16,5 +16,17 @@
     "canonical_name": "Initech Solutions Inc",
     "aliases": ["Initech", "Initech Solutions"],
     "approved": false
+  },
+  {
+    "vendor_id": "V-NORTHSTAR",
+    "canonical_name": "Northstar Office Supplies LLC",
+    "aliases": ["Northstar Office Supplies", "Northstar Supplies", "Northstar"],
+    "approved": true
+  },
+  {
+    "vendor_id": "V-APEX",
+    "canonical_name": "Apex Industrial Components Ltd",
+    "aliases": ["Apex Industrial", "Apex Components", "Apex"],
+    "approved": false
   }
 ]

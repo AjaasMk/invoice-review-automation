@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 from pipeline.intake.folder_source import FolderSource
@@ -17,6 +18,7 @@ def test_poll_picks_up_supported_files_and_moves_them(tmp_path: Path) -> None:
     assert documents[0].source == "folder"
     assert documents[0].filename == "invoice.pdf"
     assert Path(documents[0].content_path).exists()
+    assert documents[0].content_sha256 == hashlib.sha256(b"%PDF-1.4 fake").hexdigest()
     assert not (watch_dir / "invoice.pdf").exists()
     assert (watch_dir / "notes.txt").exists()
 

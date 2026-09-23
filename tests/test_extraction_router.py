@@ -19,6 +19,16 @@ class FakeClient:
         return {"invoice_number": None, "invoice_date": None, "vendor_name": "Acme", "total_amount": None}
 
 
+class MultiImageFakeClient(FakeClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.multi_image_calls: list[list[tuple[bytes, str]]] = []
+
+    def structure_from_images(self, images: list[tuple[bytes, str]]) -> dict:
+        self.multi_image_calls.append(images)
+        return {"invoice_number": "INV-MULTI", "invoice_date": "2026-08-02", "vendor_name": "Acme", "total_amount": 5000}
+
+
 def _make_text_pdf(path: Path) -> None:
     c = canvas.Canvas(str(path))
     c.drawString(72, 720, "Invoice INV-1 from Acme Corp, total 5000 USD")
@@ -57,3 +67,16 @@ def test_scanned_pdf_with_no_text_layer_routes_to_vision_path(tmp_path: Path) ->
     raw, extraction_path, confidence = route_and_extract(str(pdf_path), client)
     assert extraction_path == "vision"
     assert len(client.image_calls) == 1
+
+
+def test_scanned_multipage_pdf_sends_every_page_to_vision_client(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "multipage-scan.pdf"
+    c = canvas.Canvas(str(pdf_path))
+    c.showPage()
+    c.showPage()
+    c.save()
+    client = MultiImageFakeClient()
+    _, extraction_path, _ = route_and_extract(str(pdf_path), client)
+    assert extraction_path == "vision"
+    assert len(client.multi_image_calls) == 1
+    assert len(client.multi_image_calls[0]) == 2

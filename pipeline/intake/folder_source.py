@@ -1,3 +1,4 @@
+import hashlib
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -22,6 +23,7 @@ class FolderSource:
                 continue
             doc_id = str(uuid.uuid4())
             destination = self._storage_dir / f"{doc_id}{path.suffix.lower()}"
+            content_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
             shutil.move(str(path), str(destination))
             documents.append(
                 IncomingDocument(
@@ -31,6 +33,7 @@ class FolderSource:
                     sender=None,
                     filename=path.name,
                     content_path=str(destination),
+                    content_sha256=content_sha256,
                 )
             )
         return documents

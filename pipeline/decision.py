@@ -10,6 +10,7 @@ _EXPLANATIONS = {
     "PO_NOT_FOUND": "No matching purchase order was found for this vendor.",
     "AMOUNT_OVER_TOLERANCE": "The invoice amount is outside the allowed tolerance of the purchase order amount.",
     "PO_BALANCE_EXCEEDED": "The invoice amount exceeds the purchase order's remaining balance beyond tolerance.",
+    "CONCURRENT_PO_UPDATE": "Another invoice changed the purchase order balance while this run was being finalized.",
 }
 
 
@@ -34,7 +35,10 @@ def decide(invoice: Invoice, match: MatchResult) -> Decision:
     if match.duplicate_of:
         reason_codes.append("DUPLICATE_SUSPECTED")
 
-    if match.vendor is not None and match.po is None:
+    has_po_search_inputs = bool(invoice.po_reference) or (
+        invoice.invoice_date is not None and (invoice.subtotal is not None or invoice.total_amount is not None)
+    )
+    if match.vendor is not None and match.po is None and has_po_search_inputs:
         reason_codes.append("PO_NOT_FOUND")
 
     if match.po is not None and match.comparison_amount is not None and not match.amount_within_tolerance:

@@ -11,11 +11,15 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
+On Windows PowerShell, use `Copy-Item .env.example .env` for the second command.
+
 Edit `.env` — the model reads the invoice; it never decides approve/reject:
-- `LLM_PROVIDER` — `anthropic` or `nvidia`. Leave blank and it auto-picks whichever API key is set (NVIDIA first if both are present).
+- `LLM_PROVIDER` — `deepseek`, `nvidia`, or `anthropic`. Leave blank and it auto-picks an available key (DeepSeek first, then NVIDIA, then Anthropic).
+- `DEEPSEEK_API_KEY` + `DEEPSEEK_MODEL` — for DeepSeek's Chat Completions endpoint. `deepseek-flash` handles text PDFs and rendered scanned/image invoices. Add the key locally before switching `LLM_PROVIDER=deepseek`.
 - `ANTHROPIC_API_KEY` — for the Claude-backed clients.
-- `NVIDIA_API_KEY` + `NVIDIA_MODEL` — for the free NVIDIA `integrate.api.nvidia.com` endpoint (OpenAI-compatible). `NVIDIA_MODEL` defaults to `moonshotai/kimi-k3`, but that model was hanging indefinitely on non-streaming calls as of this build (confirmed: valid model, working key, other models on the same account respond in under a second) — `meta/llama-3.2-11b-vision-instruct` is the confirmed-working fallback and is what's actually configured right now. Swap `NVIDIA_MODEL` back once kimi-k3 recovers.
+- `NVIDIA_API_KEY` + `NVIDIA_MODEL` — optional fallback using NVIDIA's OpenAI-compatible endpoint at `integrate.api.nvidia.com`.
 - `GMAIL_IMAP_USER` / `GMAIL_IMAP_APP_PASSWORD` — optional. Leave blank to run on folder/upload intake only. If set, needs a Gmail [App Password](https://myaccount.google.com/apppasswords) (requires 2-Step Verification), not the account password.
+- `GMAIL_IMAP_MAILBOX` — defaults to `INBOX`. For a low-noise workflow, create a Gmail label named `Invoice Review Queue`, route trusted invoice emails to it with a Gmail filter, and set this value to that exact label name. The app will poll only that label.
 
 Generate the test fixtures (happy path + all 4 edge cases) if `data/invoices/` is empty:
 
@@ -33,13 +37,13 @@ No API key handy? `python preview_server.py` runs the same UI on fake extraction
 
 Open `http://localhost:8000`. Three tabs:
 - **Gate** — drag an invoice in (or drop a file into `runs/inbox/`, or send one to the configured Gmail inbox if IMAP is on) and approve/reject it.
-- **Live Run** — watch each pipeline stage light up in real time over SSE as it executes.
-- **Dashboard** — every run, its decision, and its reason codes; click a row to reopen its full trace.
+- **Live Run** — watch each pipeline stage move from started to completed (or failed) over SSE as it executes.
+- **Dashboard** — filterable history with invoice, vendor, amount, status, decision, and reason codes; click a row to reopen its full trace.
 
 ## Verify it
 
 ```bash
-python -m pytest tests/ -v          # 77 unit/integration tests
+python -m pytest tests/ -v          # unit and integration suite
 python -m evals.run_evals           # structured JSON pass/fail across happy path + all 4 edge cases
 ```
 
@@ -58,7 +62,16 @@ python -m pipeline.rerun --run <run_id> --from decide
 
 ## Architecture, in one paragraph
 
-FastAPI serves the UI and API over SSE. LangGraph orchestrates the pipeline as a checkpointed state machine: triage → **human gate (durable interrupt)** → extract (pdfplumber for machine-readable PDFs, Claude vision for scans/images) → normalize → validate → vendor resolve (fuzzy match) → PO match (candidate retrieval + weighted scoring + cumulative balance tracking + duplicate detection) → decide (pure, config-driven rules). SQLite stores runs, per-stage artifacts, vendors, and POs. The model only ever extracts structured fields — every approve/reject/flag decision is a deterministic function over those fields, so it's reproducible and explainable.
+FastAPI serves the UI and API over SSE. LangGraph orchestrates the pipeline as a checkpointed state machine: triage → **human gate (durable interrupt)** → extract (pdfplumber for machine-readable PDFs, configured vision model for scans/images) → normalize → validate → vendor resolve (fuzzy match) → PO match (candidate retrieval + weighted scoring + cumulative balance tracking + duplicate detection) → decide (pure, config-driven rules). SQLite stores runs, per-stage artifacts, vendors, and POs. The model only ever extracts structured fields — every approve/reject/flag decision is a deterministic function over those fields, so it's reproducible and explainable.
+
+Scanned PDFs are rendered page by page and all pages are provided to vision extraction. PO candidates must match the resolved vendor and currency; explicit PO references cannot silently fall back to another PO, while reference-free matches must fit the configured date and amount windows.
+
+Every incoming attachment also receives a SHA-256 fingerprint. An exact re-upload is stopped before triage or extraction and recorded as `NEEDS_REVIEW` with `EXACT_FILE_DUPLICATE`; separately, the existing vendor/invoice-number/date/amount comparison catches re-sent invoices whose PDF bytes differ.
+
+## Deploy and demonstrate
+
+- Docker/cloud-host instructions: [`docs/deployment.md`](docs/deployment.md)
+- Five-minute recording and interview sequence: [`docs/demo-runbook.md`](docs/demo-runbook.md)
 
 ## Edge cases (all verified in `evals/run_evals.py`)
 
@@ -77,3 +90,5 @@ FastAPI serves the UI and API over SSE. LangGraph orchestrates the pipeline as a
 - `AnthropicExtractionClient`/`AnthropicTriageClient`/`RealImapClient` are not covered by the automated test suite — they need live credentials. See the manual smoke-test commands in the design spec (§ extraction, § IMAP) to exercise them directly.
 - Amount tolerance, duplicate detection window, and confidence floor are illustrative defaults in `pipeline/config.py`, not derived from real historical data — callable out live if asked.
 - Real-model testing surfaced something worth knowing going in: a vision model shown a genuinely illegible scan doesn't reliably self-report low confidence — it can fabricate a complete, plausible-looking invoice instead of admitting it can't read one. `EXTRACTION_INSTRUCTIONS` explicitly forbids this now, and `parse_json_response` degrades to an all-null result (rather than crashing) when a model abstains in prose instead of JSON — but this is a real, ongoing model-behavior risk worth stating plainly, not a solved problem.
+- `extraction_confidence` is a conservative completeness heuristic over critical fields, not a calibrated probability from the model.
+- On 2026-09-21, the full live suite passed 7/7 through NVIDIA with `meta/llama-3.2-11b-vision-instruct`. The `moonshotai/kimi-k3` configuration remained non-responsive during a multi-minute verification attempt. DeepSeek support is prepared but must pass the same live suite once a key is available.

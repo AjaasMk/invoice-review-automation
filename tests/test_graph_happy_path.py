@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 from pipeline.graph import build_graph, resume_run, start_run
@@ -77,3 +78,27 @@ def test_rejected_at_gate_never_reaches_extraction(tmp_path: Path) -> None:
     run_after = repo.get_run("run-2")
     assert run_after["status"] == "REJECTED_AT_GATE"
     assert run_after["decision"] is None
+
+
+def test_exact_file_duplicate_stops_before_triage_and_extraction(tmp_path: Path) -> None:
+    repo = _seeded_repo(tmp_path)
+    app = build_graph(repo, FakeExtractionClient(), FakeTriageClient(), str(tmp_path / "checkpoints.db"))
+    fingerprint = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
+    first = IncomingDocument(
+        doc_id="doc-first", source="folder", received_at="2026-08-02T00:00:00Z", sender=None,
+        filename="happy_path.pdf", content_path=str(FIXTURE), content_sha256=fingerprint,
+    )
+    start_run(app, "run-first", first, repo)
+    resume_run(app, "run-first", approved=True)
+
+    second = IncomingDocument(
+        doc_id="doc-second", source="folder", received_at="2026-08-02T00:00:01Z", sender=None,
+        filename="happy_path.pdf", content_path=str(FIXTURE), content_sha256=fingerprint,
+    )
+    start_run(app, "run-second", second, repo)
+
+    duplicate_run = repo.get_run("run-second")
+    assert duplicate_run["status"] == "DONE"
+    assert duplicate_run["decision"]["outcome"] == "NEEDS_REVIEW"
+    assert duplicate_run["decision"]["reason_codes"] == ["EXACT_FILE_DUPLICATE"]
+    assert [stage["stage"] for stage in repo.get_stages("run-second")] == ["intake", "deduplicate", "decide"]

@@ -1,0 +1,35 @@
+# Deployment Guide
+
+The application is packaged as a single Docker service. It needs outbound HTTPS access to the selected model API and a writable `runs` directory for SQLite databases, uploaded invoices, and LangGraph checkpoints.
+
+## Required environment variables
+
+- `LLM_PROVIDER=deepseek`
+- `DEEPSEEK_API_KEY=<your key>`
+- `DEEPSEEK_MODEL=deepseek-flash`
+- `PORT=8000` when the hosting platform does not inject its own port
+
+Gmail intake is optional. Add `GMAIL_IMAP_USER` and `GMAIL_IMAP_APP_PASSWORD` only when the deployed service should poll a dedicated demo inbox. Set `GMAIL_IMAP_MAILBOX=Invoice Review Queue` after creating that Gmail label and a filter that applies it only to expected invoice attachments; the app then avoids polling the whole inbox.
+
+## Local container check
+
+```bash
+docker build -t invoice-decision-pipeline .
+docker run --rm -p 8000:8000 --env-file .env -v invoice-runs:/app/runs invoice-decision-pipeline
+```
+
+Open `http://localhost:8000/api/health` first, then `http://localhost:8000`.
+
+## Cloud host requirements
+
+Use any Docker-capable host and configure:
+
+- Health-check path: `/api/health`
+- Container port: the platform-provided `PORT`, falling back to `8000`
+- Persistent disk mounted at `/app/runs`
+- One application instance for this demo, because SQLite is the persistence layer
+- Model API credentials as secret environment variables, never build arguments
+
+After deployment, run one happy-path upload and one degraded-scan upload against the public URL before recording or submitting it. Do not seed the production demo database with prior runs unless those runs are intentionally part of the dashboard story.
+
+DeepSeek has not yet been live-verified with this pipeline. If it is unavailable during a demo, the existing NVIDIA path remains available: set `LLM_PROVIDER=nvidia`, `NVIDIA_API_KEY`, and `NVIDIA_MODEL=meta/llama-3.2-11b-vision-instruct`. That fallback completed the repository's seven-case live smoke suite on 2026-09-21.

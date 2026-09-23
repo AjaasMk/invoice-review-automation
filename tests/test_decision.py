@@ -105,3 +105,18 @@ def test_reason_codes_accumulate_when_multiple_apply() -> None:
     match = MatchResult(vendor=None, po=None)
     result = decide(_invoice(extraction_confidence=0.2), match)
     assert set(result.reason_codes) == {"LOW_EXTRACTION_CONFIDENCE", "VENDOR_NOT_FOUND"}
+
+
+def test_missing_match_inputs_do_not_add_misleading_po_not_found_reason() -> None:
+    invoice = _invoice(
+        invoice_number=None,
+        invoice_date=None,
+        po_reference=None,
+        subtotal=None,
+        total_amount=None,
+        extraction_confidence=0.25,
+        missing_fields=["invoice_number", "invoice_date", "total_amount"],
+    )
+    result = decide(invoice, MatchResult(vendor=ACME, po=None))
+    assert result.outcome == "NEEDS_REVIEW"
+    assert result.reason_codes == ["LOW_EXTRACTION_CONFIDENCE", "MISSING_REQUIRED_FIELD"]

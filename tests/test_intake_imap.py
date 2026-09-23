@@ -1,4 +1,5 @@
 from email.message import EmailMessage
+import hashlib
 from pathlib import Path
 
 from pipeline.intake.imap_source import ImapSource
@@ -43,6 +44,7 @@ def test_poll_extracts_pdf_attachment_and_marks_seen(tmp_path: Path) -> None:
     assert documents[0].filename == "invoice.pdf"
     assert documents[0].sender == "vendor@example.com"
     assert Path(documents[0].content_path).read_bytes().startswith(b"%PDF")
+    assert documents[0].content_sha256 == hashlib.sha256(b"%PDF-1.4 fake content").hexdigest()
     assert client.selected_mailbox == "INBOX"
     assert client.marked_seen == [b"1"]
 
@@ -58,3 +60,12 @@ def test_poll_ignores_messages_without_supported_attachments(tmp_path: Path) -> 
 
     assert documents == []
     assert client.marked_seen == [b"2"]
+
+
+def test_poll_can_target_a_dedicated_review_queue_label(tmp_path: Path) -> None:
+    client = FakeImapClient({b"3": _build_raw_email_with_pdf_attachment()})
+    source = ImapSource(client, str(tmp_path / "storage"), mailbox="Invoice Review Queue")
+
+    source.poll()
+
+    assert client.selected_mailbox == "Invoice Review Queue"

@@ -84,11 +84,11 @@ def test_duplicate_detection_flags_near_duplicate_within_window() -> None:
     assert "INV-2001" in result.duplicate_of
 
 
-def test_duplicate_detection_ignores_same_invoice_number() -> None:
+def test_duplicate_detection_flags_same_invoice_number() -> None:
     prior = _invoice(invoice_number="INV-1", invoice_date=date(2026, 8, 1), total_amount=Decimal("2000"))
     current = _invoice(invoice_number="INV-1", invoice_date=date(2026, 8, 4), total_amount=Decimal("2000"))
     result = match_po(current, ACME, [], [prior])
-    assert result.duplicate_of == []
+    assert result.duplicate_of == ["INV-1"]
 
 
 def test_explicit_po_reference_wins_over_closer_amount_match() -> None:
@@ -97,3 +97,22 @@ def test_explicit_po_reference_wins_over_closer_amount_match() -> None:
     invoice = _invoice(po_reference="PO-A", subtotal=Decimal("4999"), total_amount=Decimal("4999"))
     result = match_po(invoice, ACME, [referenced, closer_amount], [])
     assert result.po is not None and result.po.po_id == "PO-A"
+
+
+def test_unknown_explicit_po_reference_does_not_fall_back_to_an_unrelated_po() -> None:
+    po = PurchaseOrder(po_id="PO-A", vendor_id="V-ACME", amount=Decimal("5000"), issued_date=date(2026, 8, 1), tax_treatment="exclusive")
+    result = match_po(_invoice(po_reference="PO-DOES-NOT-EXIST"), ACME, [po], [])
+    assert result.po is None
+
+
+def test_implicit_match_requires_date_and_amount_to_fit_candidate_windows() -> None:
+    old_po = PurchaseOrder(po_id="PO-OLD", vendor_id="V-ACME", amount=Decimal("5000"), issued_date=date(2025, 1, 1), tax_treatment="exclusive")
+    wrong_amount = PurchaseOrder(po_id="PO-WRONG", vendor_id="V-ACME", amount=Decimal("100000"), issued_date=date(2026, 8, 1), tax_treatment="exclusive")
+    result = match_po(_invoice(po_reference=None), ACME, [old_po, wrong_amount], [])
+    assert result.po is None
+
+
+def test_currency_mismatch_does_not_match() -> None:
+    po = PurchaseOrder(po_id="PO-EUR", vendor_id="V-ACME", amount=Decimal("5000"), currency="EUR", issued_date=date(2026, 8, 1), tax_treatment="exclusive")
+    result = match_po(_invoice(po_reference="PO-EUR", currency="USD"), ACME, [po], [])
+    assert result.po is None

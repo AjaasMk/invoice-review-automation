@@ -3,7 +3,7 @@ import os
 
 from anthropic import Anthropic
 
-from pipeline.extraction import nvidia_client
+from pipeline.extraction import deepseek_client, nvidia_client
 from pipeline.extraction.client import EMPTY_EXTRACTION_RESULT, EXTRACTION_INSTRUCTIONS
 from pipeline.extraction.json_parsing import parse_json_response
 
@@ -27,19 +27,18 @@ class AnthropicExtractionClient:
         return parse_json_response(text_from_response(response), fallback=EMPTY_EXTRACTION_RESULT)
 
     def structure_from_image(self, image_bytes: bytes, media_type: str) -> dict:
-        encoded = base64.standard_b64encode(image_bytes).decode("utf-8")
+        return self.structure_from_images([(image_bytes, media_type)])
+
+    def structure_from_images(self, images: list[tuple[bytes, str]]) -> dict:
+        content = []
+        for image_bytes, media_type in images:
+            encoded = base64.standard_b64encode(image_bytes).decode("utf-8")
+            content.append({"type": "image", "source": {"type": "base64", "media_type": media_type, "data": encoded}})
+        content.append({"type": "text", "text": EXTRACTION_INSTRUCTIONS})
         response = self._client.messages.create(
             model=self._model,
             max_tokens=1024,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": encoded}},
-                        {"type": "text", "text": EXTRACTION_INSTRUCTIONS},
-                    ],
-                }
-            ],
+            messages=[{"role": "user", "content": content}],
         )
         return parse_json_response(text_from_response(response), fallback=EMPTY_EXTRACTION_RESULT)
 
@@ -59,6 +58,28 @@ class NvidiaExtractionClient:
         return parse_json_response(raw_text, fallback=EMPTY_EXTRACTION_RESULT)
 
     def structure_from_image(self, image_bytes: bytes, media_type: str) -> dict:
-        content = nvidia_client.build_image_message(EXTRACTION_INSTRUCTIONS, image_bytes, media_type)
+        return self.structure_from_images([(image_bytes, media_type)])
+
+    def structure_from_images(self, images: list[tuple[bytes, str]]) -> dict:
+        content = nvidia_client.build_images_message(EXTRACTION_INSTRUCTIONS, images)
         raw_text = nvidia_client.call_nvidia_chat(content, self._model, self._api_key)
+        return parse_json_response(raw_text, fallback=EMPTY_EXTRACTION_RESULT)
+
+
+class DeepSeekExtractionClient:
+    def __init__(self, api_key: str | None = None, model: str = deepseek_client.DEFAULT_DEEPSEEK_MODEL) -> None:
+        self._api_key = api_key
+        self._model = model
+
+    def structure_from_text(self, text: str) -> dict:
+        content = nvidia_client.build_text_message(EXTRACTION_INSTRUCTIONS, text)
+        raw_text = deepseek_client.call_deepseek_chat(content, self._model, self._api_key)
+        return parse_json_response(raw_text, fallback=EMPTY_EXTRACTION_RESULT)
+
+    def structure_from_image(self, image_bytes: bytes, media_type: str) -> dict:
+        return self.structure_from_images([(image_bytes, media_type)])
+
+    def structure_from_images(self, images: list[tuple[bytes, str]]) -> dict:
+        content = nvidia_client.build_images_message(EXTRACTION_INSTRUCTIONS, images)
+        raw_text = deepseek_client.call_deepseek_chat(content, self._model, self._api_key)
         return parse_json_response(raw_text, fallback=EMPTY_EXTRACTION_RESULT)

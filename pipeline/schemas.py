@@ -14,6 +14,10 @@ class IncomingDocument(BaseModel):
     sender: str | None
     filename: str
     content_path: str
+    content_sha256: str | None = None
+    intake_score: int | None = None
+    intake_decision: Literal["process", "review", "ignore"] | None = None
+    intake_reasons: list[str] = Field(default_factory=list)
 
 
 class TriageResult(BaseModel):

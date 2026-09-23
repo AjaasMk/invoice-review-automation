@@ -66,6 +66,37 @@ def test_upload_triages_and_appears_in_gate_pending(tmp_path: Path) -> None:
         assert matching["triage"]["looks_like_invoice"] is True
 
 
+def test_workspace_exposes_reference_data_without_credentials(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "secret-must-not-appear")
+    monkeypatch.setenv("GMAIL_IMAP_APP_PASSWORD", "mail-secret-must-not-appear")
+    with _seeded_app(tmp_path)[0] as client:
+        response = client.get("/api/workspace")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["vendors"][0]["vendor_id"] == "V-ACME"
+        assert data["purchase_orders"][0]["remaining_balance"] == "5000"
+        assert data["runtime"]["email_enabled"] is False
+        assert set(data["runtime"]) == {"extraction_client", "model", "email_enabled", "poll_interval_seconds"}
+        assert "secret-must-not-appear" not in response.text
+
+
+def test_workspace_reflects_processed_po_balance(tmp_path: Path) -> None:
+    with _seeded_app(tmp_path)[0] as client:
+        result = client.post("/api/upload", files={"file": ("invoice.pdf", FIXTURE.read_bytes(), "application/pdf")})
+        run_id = result.json()["run_id"]
+        client.post(f"/api/gate/{run_id}/approve")
+        for _ in range(100):
+            run = client.get(f"/api/runs/{run_id}").json()
+            if run["status"] == "DONE":
+                break
+            time.sleep(0.05)
+        assert run["status"] == "DONE"
+        assert run["po_reference"] == "PO-1001"
+        order = client.get("/api/workspace").json()["purchase_orders"][0]
+        assert order["invoiced_to_date"] == "5000"
+        assert order["remaining_balance"] == "0"
+
+
 def test_approve_runs_pipeline_to_auto_approve(tmp_path: Path) -> None:
     with _seeded_app(tmp_path)[0] as client:
         with open(FIXTURE, "rb") as f:
@@ -102,3 +133,34 @@ def test_reject_marks_run_rejected(tmp_path: Path) -> None:
                 break
             time.sleep(0.05)
         assert final_status == "REJECTED_AT_GATE"
+
+
+def test_upload_rejects_unsupported_files(tmp_path: Path) -> None:
+    with _seeded_app(tmp_path)[0] as client:
+        response = client.post("/api/upload", files={"file": ("notes.txt", b"not an invoice", "text/plain")})
+        assert response.status_code == 415
+
+
+def test_gate_decision_cannot_be_submitted_twice(tmp_path: Path) -> None:
+    with _seeded_app(tmp_path)[0] as client:
+        with open(FIXTURE, "rb") as f:
+            response = client.post("/api/upload", files={"file": ("happy_path.pdf", f, "application/pdf")})
+        run_id = response.json()["run_id"]
+        assert client.post(f"/api/gate/{run_id}/reject").status_code == 200
+        for _ in range(40):
+            if client.get(f"/api/runs/{run_id}").json()["status"] == "REJECTED_AT_GATE":
+                break
+            time.sleep(0.05)
+        assert client.post(f"/api/gate/{run_id}/approve").status_code == 409
+
+
+def test_demo_reset_requires_confirmation_and_clears_runs(tmp_path: Path) -> None:
+    with _seeded_app(tmp_path)[0] as client:
+        with open(FIXTURE, "rb") as f:
+            response = client.post("/api/upload", files={"file": ("happy_path.pdf", f, "application/pdf")})
+        assert response.status_code == 200
+        assert client.post("/api/demo/reset").status_code == 400
+        reset_response = client.post("/api/demo/reset?confirm=true")
+        assert reset_response.status_code == 200
+        assert reset_response.json()["runs_cleared"] == 1
+        assert client.get("/api/runs").json() == []

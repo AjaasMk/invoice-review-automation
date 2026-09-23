@@ -1,112 +1,78 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ledger — an AI employee for accounts payable</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,700,500,400&f[]=switzer@400,500,600,700&display=swap">
-<link rel="stylesheet" href="/styles.css">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#EFEFEF">
+  <title>Ledger — Work on what matters.</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%23000'/%3E%3Cpath d='M12 9v22h18v-5H17V9z' fill='%23EFEFEF'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css?v=live-db-1"><script src="/app.js?v=intake-backstop-1" defer></script>
 </head>
 <body>
-<div class="glitch-field" aria-hidden="true">
-  <div class="glitch-blob blob-a"></div>
-  <div class="glitch-blob blob-b"></div>
-  <div class="glitch-blob blob-c"></div>
-  <div class="glitch-noise"></div>
-  <div class="glitch-scan"></div>
-</div>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#home" aria-label="Ledger home"><span class="brand-mark" aria-hidden="true">L<span></span></span>Ledger<span class="brand-dot">®</span></a>
+    <div class="workspace-label"><span class="workspace-icon">W</span><div>Workspace<small>Local development</small></div></div>
+    <div class="nav-label">WORKSPACE</div><nav aria-label="Main navigation" id="navigation"></nav>
+    <div class="sidebar-bottom"><span class="eyebrow">LESS BUSYWORK.<br>MORE HUMAN.</span><p>Work on what matters.</p><a href="#settings" class="system-state"><span class="status-dot"></span><span id="connection-state">Connecting…</span></a><span class="version">LEDGER / V.01</span></div>
+  </aside>
+  <button class="nav-scrim" id="nav-scrim" aria-label="Close navigation" hidden></button>
+  <div class="app-shell">
+    <header class="utility-bar">
+      <button class="icon-button menu-toggle" id="menu-toggle" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar"></button>
+      <div class="breadcrumb">Workspace <span>/</span> <strong id="breadcrumb">Overview</strong></div>
+      <form class="global-search" id="search-form" role="search"><span id="search-icon"></span><input id="global-search" aria-label="Search invoices" placeholder="Search invoices…" autocomplete="off"><kbd>↵</kbd></form>
+      <div class="utility-actions"><button class="icon-button notification-button" id="notifications" aria-label="Notifications" aria-expanded="false" aria-controls="notification-panel"></button><button class="avatar" id="account" aria-label="Workspace account" aria-expanded="false" aria-controls="account-panel">LW</button></div>
+      <section class="popover" id="notification-panel" aria-label="Notifications" hidden></section>
+      <section class="popover" id="account-panel" aria-label="Workspace account" hidden><span class="eyebrow">YOUR WORKSPACE</span><h3>Ledger workspace</h3><p>Local development instance.<br>No account authentication is configured.</p><a class="text-link" href="#settings">Workspace settings ↗</a></section>
+    </header>
+    <main id="main" tabindex="-1">
+      <div class="connection-error" id="connection-error" role="alert" hidden></div>
+      <section id="home-view" class="view">
+        <div class="section-overline"><span><span class="status-dot blue"></span> YOUR ACCOUNTS PAYABLE, IN ORDER.</span><span id="today"></span></div>
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy"><h1 id="hero-title">Invoices<br>in flow<span class="period">.</span></h1><div class="hero-bottom"><p>Ledger reads, matches, and routes your invoices.<br>So you can focus on the exceptions.</p><button class="button primary" data-action="upload">Upload invoice <span aria-hidden="true">↗</span></button></div></div>
+          <div class="hero-art" id="background-flow" aria-hidden="true">
+            <svg viewBox="0 0 500 340" fill="none">
+              <defs><pattern id="flow-dots" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#545BFF"/></pattern></defs>
+              <path class="flow-halo" d="M150 280V128a100 100 0 0 1 200 0v145h-48V128a52 52 0 0 0-104 0v152z" fill="url(#flow-dots)"/>
+              <g class="background-connectors" stroke-width="1"><path d="M80 71H247V142H400V247H465"/></g>
+              <g class="background-node email-node"><rect x="25" y="38" width="128" height="65" rx="2"/><path d="M38 53h18v13H38zm0 0 9 7 9-7" stroke="#545BFF"/><text x="64" y="64">VENDOR EMAIL</text><text x="38" y="86" class="node-value">INV-2048.pdf</text></g>
+              <g class="background-node extract-node"><rect x="182" y="112" width="137" height="80" rx="2"/><text x="197" y="132">LEDGER / EXTRACT</text><path class="scan-beam" d="M192 144h116" stroke="#545BFF" stroke-width="2"/><text x="197" y="153" class="node-value">Acme Supplies</text><text x="197" y="175" class="node-value">$12,480 · PO-83921</text></g>
+              <g class="background-node match-node"><rect x="337" y="217" width="143" height="68" rx="2"/><text x="351" y="238">PO / VALIDATE</text><text x="351" y="259" class="node-value">$12,480 · MATCHED</text></g>
+              <path d="M454 298v12m-6-6h12" stroke="#000"/><text x="322" y="308" class="outcome-label">APPROVED · READY TO POST</text>
+              <g class="travel-document"><rect x="-7" y="-9" width="14" height="18" rx="1" fill="#545BFF"/><path d="M-3-3h6M-3 1h6M-3 5h4" stroke="white"/></g>
+            </svg>
+          </div>
+        </section>
 
-<header class="masthead">
-  <div class="topbar">
-    <div class="logo-mark" aria-hidden="true">
-      <svg viewBox="0 0 32 32" width="26" height="26">
-        <rect x="2" y="2" width="12" height="12" fill="currentColor"/>
-        <rect x="18" y="2" width="12" height="12" fill="currentColor" opacity="0.35"/>
-        <rect x="2" y="18" width="12" height="12" fill="currentColor" opacity="0.35"/>
-        <rect x="18" y="18" width="12" height="12" fill="currentColor"/>
-      </svg>
-      <span>ledger.ai</span>
-    </div>
-    <div class="status-chip" id="status-chip">
-      <span class="status-dot"></span>
-      <span id="status-text">Ledger is idle</span>
-    </div>
+        <nav class="home-actions" aria-label="Choose a task">
+          <button data-action="upload"><span class="action-number">01</span><span><strong>Upload</strong><small>Add an invoice</small></span><span aria-hidden="true">↗</span></button>
+          <a href="#review"><span class="action-number">02</span><span><strong>Review</strong><small id="home-review-count">Check what needs attention</small></span><span aria-hidden="true">↗</span></a>
+          <a href="#invoices"><span class="action-number">03</span><span><strong>Invoices</strong><small id="home-invoice-count">View results</small></span><span aria-hidden="true">↗</span></a>
+          <a href="#orders"><span class="action-number">04</span><span><strong>Live database</strong><small>View vendors and purchase orders</small></span><span aria-hidden="true">↗</span></a>
+        </nav>
+        <div class="home-secondary"><button class="text-link" data-action="workflow">How it works ↗</button><a class="text-link" href="#orders">View live database ↗</a><a class="text-link" href="#reports">View reports ↗</a></div>
+
+      </section>
+      <section id="page-view" class="view" hidden><div class="page-heading"><div><span class="eyebrow" id="page-eyebrow">WORKSPACE</span><h1 id="page-title"></h1><p id="page-description"></p></div><button class="button primary" data-action="upload">Upload invoice ↗</button></div><div id="page-content"></div></section>
+      <footer class="page-footer"><span>Ledger® <span class="muted">Your intelligent accounts payable workspace.</span></span><span>WORK ON WHAT MATTERS. ↗</span></footer>
+    </main>
   </div>
-
-  <div class="hero">
-    <h1 class="wordmark">ledger</h1>
-    <p class="hero-line">Hi — I'm Ledger, an AI employee for accounts payable.<br>Show me an invoice and I'll extract it, match it to a PO, and tell you exactly why.</p>
-  </div>
-
-  <nav class="tabs" role="tablist">
-    <button class="tab-button active" data-tab="gate" role="tab" aria-selected="true">Intake</button>
-    <button class="tab-button" data-tab="live" role="tab" aria-selected="false">Live Run</button>
-    <button class="tab-button" data-tab="dashboard" role="tab" aria-selected="false">Ledger</button>
-  </nav>
-</header>
-
-<main>
-  <section id="tab-gate" class="tab-panel active">
-    <div class="section-head">
-      <h2>What's in the tray</h2>
-      <p class="section-note">Nothing moves past this point without a human saying so.</p>
-    </div>
-
-    <div class="upload-box" tabindex="0">
-      <svg class="upload-icon" viewBox="0 0 48 48" width="26" height="26" aria-hidden="true">
-        <path d="M24 6 L24 30 M14 18 L24 6 L34 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M8 34 L8 40 Q8 42 10 42 L38 42 Q40 42 40 40 L40 34" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="upload-label">Drop an invoice, or click to select</span>
-      <span class="upload-sub">PDF · PNG · JPG</span>
-      <input id="upload-input" type="file" accept=".pdf,.png,.jpg,.jpeg">
-    </div>
-
-    <div id="gate-list" class="card-list"></div>
-    <p id="gate-empty" class="empty-state">Tray's empty. I'm caught up.</p>
-  </section>
-
-  <section id="tab-live" class="tab-panel">
-    <div class="section-head">
-      <h2>What I'm doing right now</h2>
-      <p class="section-note">Every stage, as I work through it.</p>
-    </div>
-
-    <div class="live-controls">
-      <label for="run-select">Watching</label>
-      <select id="run-select"></select>
-      <span class="live-indicator" id="live-indicator"><span class="live-dot"></span>live</span>
-    </div>
-
-    <ol id="stage-timeline" class="stage-timeline"></ol>
-    <p id="live-empty" class="empty-state">Nothing to watch yet — approve something from Intake.</p>
-  </section>
-
-  <section id="tab-dashboard" class="tab-panel">
-    <div class="section-head">
-      <h2>Everything I've decided</h2>
-      <p class="section-note">Every run, every outcome, and my reasoning for it.</p>
-    </div>
-
-    <table id="runs-table" class="runs-table">
-      <thead>
-        <tr>
-          <th>Run</th>
-          <th>Status</th>
-          <th>Decision</th>
-          <th>Reasoning</th>
-          <th>Updated</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-    <p id="dashboard-empty" class="empty-state">No history yet — this fills in as I work.</p>
-  </section>
-</main>
-
-<script src="/app.js"></script>
+  <dialog class="upload-dialog" id="upload-dialog" aria-labelledby="upload-title"><button class="icon-button dialog-close" data-close="upload-dialog" aria-label="Close upload">×</button><span class="eyebrow">INTO THE FLOW</span><h2 id="upload-title">One less thing<br>on your desk.</h2><p>Upload an invoice. Ledger will check for duplicates and prepare it for intake review.</p><form id="upload-form"><label class="dropzone" id="dropzone"><span class="upload-symbol">↥</span><strong id="file-label">Choose a file or drop it here</strong><span>PDF, PNG or JPG · Up to 15 MB</span><input type="file" id="invoice-file" aria-label="Invoice file" accept=".pdf,.png,.jpg,.jpeg" required></label><p class="form-message" id="upload-message" role="status"></p><button class="button primary full-width" type="submit" id="upload-submit">Upload & check invoice ↗</button></form></dialog>
+  <dialog class="detail-dialog" id="detail-dialog" aria-labelledby="detail-title"><div class="drawer-top"><span class="eyebrow">INVOICE WORKSPACE</span><button class="icon-button" data-close="detail-dialog" aria-label="Close invoice details">×</button></div><div id="detail-content"></div></dialog>
+  <dialog class="reset-dialog" id="reset-dialog" aria-labelledby="reset-title"><span class="eyebrow">DEVELOPMENT ONLY</span><h2 id="reset-title">Start a clean run?</h2><p>This permanently removes all run history, invoice records and checkpoints, and resets every PO’s invoiced balance to zero. Reference vendors, purchase orders and source files remain.</p><p>There is no undo. Email and folder polling remain enabled if configured.</p><div class="button-row"><button class="button" data-close="reset-dialog">Cancel</button><button class="button danger" id="confirm-reset">Reset demo data</button></div><p id="reset-message" role="status"></p></dialog>
+  <dialog class="workflow-dialog" id="workflow-dialog" aria-labelledby="flow-title">
+    <button class="icon-button dialog-close" data-close="workflow-dialog" aria-label="Close workflow explanation">×</button>
+        <section class="flow-section" aria-labelledby="flow-title"><div class="section-heading"><div><span class="eyebrow">FROM INBOX TO OUTCOME</span><h2 id="flow-title">Quietly doing the work.</h2></div><span class="illustration-label">Workflow illustration</span></div>
+          <div class="workflow" id="workflow" aria-label="Illustration: email received, fields extracted, purchase order matched, invoice approved.">
+            <article class="flow-node" style="--delay:0s"><div class="node-top"><span class="node-index">01</span><span class="node-symbol">↙</span></div><h3>Invoice arrives</h3><p>Vendor email</p><div class="mini-document">▤ <span>INV-2048.pdf<small>Acme Supplies</small></span></div></article>
+            <article class="flow-node" style="--delay:1.5s"><div class="node-top"><span class="node-index">02</span><span class="node-symbol">L</span></div><h3>Ledger reads</h3><p>Structured, not scattered.</p><dl class="extracted-fields"><div style="--field:1.8s"><dt>Vendor</dt><dd>Acme Supplies</dd></div><div style="--field:2.2s"><dt>Invoice</dt><dd>INV-2048</dd></div><div style="--field:2.6s"><dt>Total</dt><dd>$12,480</dd></div><div style="--field:3s"><dt>PO</dt><dd>PO-83921</dd></div></dl></article>
+            <article class="flow-node" style="--delay:3.5s"><div class="node-top"><span class="node-index">03</span><span class="node-symbol">⇄</span></div><h3>Match & validate</h3><p>Checked against the PO.</p><div class="mini-comparison"><span>Invoice<strong>$12,480</strong></span><span>PO<strong>$12,480</strong></span></div><div class="mini-checks"><span>✓ Vendor matched</span><span>✓ PO total confirmed</span></div></article>
+            <article class="flow-node approved-flow" style="--delay:7s"><div class="node-top"><span class="node-index">04</span><span class="node-symbol">✓</span></div><h3>Approved</h3><p>Ready for your ledger.</p><div class="flow-outcomes"><span class="flow-approved">✓ All checks passed</span><span class="outcome-muted">Invoice posted to the approved queue.</span></div></article>
+          </div><div class="flow-footnote"><span class="tiny-blue-line"></span><span>Illustrative happy path. Actual invoices pause for intake approval before extraction.</span></div>
+        </section>
+  </dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
 </body>
 </html>

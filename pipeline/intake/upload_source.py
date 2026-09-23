@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,4 +23,5 @@ class UploadSource:
             sender=None,
             filename=filename,
             content_path=str(destination),
+            content_sha256=hashlib.sha256(content).hexdigest(),
         )

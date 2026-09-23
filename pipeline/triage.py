@@ -5,7 +5,7 @@ from typing import Protocol
 
 from anthropic import Anthropic
 
-from pipeline.extraction import nvidia_client
+from pipeline.extraction import deepseek_client, nvidia_client
 from pipeline.extraction.json_parsing import parse_json_response
 from pipeline.extraction.pdf_text import extract_raw_text, has_text_layer
 from pipeline.extraction.router import rasterize_first_page
@@ -99,4 +99,20 @@ class NvidiaTriageClient:
     def triage_image(self, image_bytes: bytes, media_type: str) -> dict:
         content = nvidia_client.build_image_message(TRIAGE_INSTRUCTIONS, image_bytes, media_type)
         raw_text = nvidia_client.call_nvidia_chat(content, self._model, self._api_key)
+        return parse_json_response(raw_text, fallback=UNCERTAIN_TRIAGE_RESULT)
+
+
+class DeepSeekTriageClient:
+    def __init__(self, api_key: str | None = None, model: str = deepseek_client.DEFAULT_DEEPSEEK_MODEL) -> None:
+        self._api_key = api_key
+        self._model = model
+
+    def triage_text(self, text: str) -> dict:
+        content = nvidia_client.build_text_message(TRIAGE_INSTRUCTIONS, text)
+        raw_text = deepseek_client.call_deepseek_chat(content, self._model, self._api_key)
+        return parse_json_response(raw_text, fallback=UNCERTAIN_TRIAGE_RESULT)
+
+    def triage_image(self, image_bytes: bytes, media_type: str) -> dict:
+        content = nvidia_client.build_image_message(TRIAGE_INSTRUCTIONS, image_bytes, media_type)
+        raw_text = deepseek_client.call_deepseek_chat(content, self._model, self._api_key)
         return parse_json_response(raw_text, fallback=UNCERTAIN_TRIAGE_RESULT)
