@@ -8,7 +8,7 @@ Design rationale and architecture: [`docs/superpowers/specs/2026-09-20-invoice-d
 
 - **Application:** FastAPI service with a responsive review workspace, live stage updates, run history, vendor/PO database view, and a development-only reset control. Invoice extraction is configured for DeepSeek.
 - **Intake:** Manual upload, watched-folder intake, and Gmail IMAP intake are implemented. Gmail processing is deliberately restricted to messages labelled `Invoice Review Queue`; an employee applies that label before the system reads the attachment.
-- **Controls:** Structured extraction is separated from deterministic validation, vendor/PO matching, cumulative PO-balance checks, and duplicate detection. Exact file duplicates are stopped before model processing; content-level duplicates are routed to review with an explanation.
+- **Controls:** Structured extraction is separated from deterministic validation, vendor/PO matching, cumulative PO-balance checks, and duplicate detection. Exact file duplicates are stopped before model processing; content-level duplicates are routed to review with an explanation. The exception drawer records human resolutions, supports vendor/PO reference-data creation, and can hold, reject, archive, or close an exception without erasing its original evidence.
 - **Demo data:** Five vendors, twenty purchase orders, regression fixtures, and three DB-matched demo invoices are included.
 - **Deployment:** Docker packaging and a Railway deployment guide are ready. The source is published in the private [GitHub repository](https://github.com/AjaasMk/invoice-review-automation); Railway connection and public-domain verification are the remaining release steps.
 

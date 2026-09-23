@@ -5,10 +5,13 @@ import os
 import sqlite3
 import uuid
 from contextlib import asynccontextmanager
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -18,10 +21,31 @@ from pipeline.intake.folder_source import FolderSource
 from pipeline.intake.imap_source import ImapSource
 from pipeline.intake.upload_source import UploadSource
 from pipeline.storage import Repository
+from pipeline.schemas import Decision, PurchaseOrder, VendorRecord
 
 logger = logging.getLogger("invoice_pipeline.web")
 SUPPORTED_UPLOAD_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg"}
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+
+
+class ExceptionResolutionRequest(BaseModel):
+    action: Literal[
+        "add_vendor", "create_purchase_order", "select_purchase_order", "correct_fields",
+        "approve_exception", "reject_invoice", "archive_invoice", "hold_for_procurement",
+        "confirm_duplicate", "mark_distinct",
+    ]
+    note: str | None = Field(default=None, max_length=1000)
+    vendor_name: str | None = Field(default=None, max_length=200)
+    vendor_aliases: list[str] = Field(default_factory=list)
+    vendor_approved: bool = False
+    selected_vendor_id: str | None = None
+    selected_po_id: str | None = None
+    po_id: str | None = Field(default=None, max_length=100)
+    po_amount: Decimal | None = Field(default=None, gt=0)
+    po_currency: str = Field(default="USD", min_length=3, max_length=3)
+    po_issued_date: date | None = None
+    po_tax_treatment: Literal["inclusive", "exclusive"] = "exclusive"
+    corrected_fields: dict[str, str] = Field(default_factory=dict)
 
 
 def create_app(
@@ -182,6 +206,94 @@ def create_app(
         if run is None:
             raise HTTPException(status_code=404, detail=f"run {run_id} not found")
         return {**run, "stages": repo.get_stages(run_id)}
+
+    @app.post("/api/runs/{run_id}/exception-resolution")
+    async def resolve_exception(run_id: str, request: ExceptionResolutionRequest) -> dict:
+        """Record a human exception decision without erasing the automated evidence."""
+        run = repo.get_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail=f"run {run_id} not found")
+        if (run.get("decision") or {}).get("outcome") != "NEEDS_REVIEW":
+            raise HTTPException(status_code=409, detail="only NEEDS_REVIEW invoices can be resolved here")
+
+        payload = request.model_dump(mode="json", exclude_none=True)
+        action = request.action
+        resolution_status = "OPEN"
+
+        if action == "add_vendor":
+            if not request.vendor_name:
+                raise HTTPException(status_code=422, detail="vendor_name is required when adding a vendor")
+            vendor = VendorRecord(
+                vendor_id=f"VND-{uuid.uuid4().hex[:8].upper()}",
+                canonical_name=request.vendor_name.strip(),
+                aliases=[alias.strip() for alias in request.vendor_aliases if alias.strip()],
+                approved=request.vendor_approved,
+            )
+            try:
+                await asyncio.to_thread(repo.add_vendor, vendor)
+            except sqlite3.IntegrityError as exc:
+                raise HTTPException(status_code=409, detail="a vendor with that identifier already exists") from exc
+            payload["created_vendor"] = vendor.model_dump(mode="json")
+            resolution_status = "REFERENCE_ADDED"
+
+        elif action == "create_purchase_order":
+            if not all([request.selected_vendor_id, request.po_id, request.po_amount, request.po_issued_date]):
+                raise HTTPException(status_code=422, detail="vendor, PO number, amount, and issued date are required")
+            if request.selected_vendor_id not in {vendor.vendor_id for vendor in repo.get_vendors()}:
+                raise HTTPException(status_code=422, detail="select an existing vendor before creating a purchase order")
+            purchase_order = PurchaseOrder(
+                po_id=request.po_id.strip(),
+                vendor_id=request.selected_vendor_id,
+                amount=request.po_amount,
+                currency=request.po_currency.upper(),
+                issued_date=request.po_issued_date,
+                tax_treatment=request.po_tax_treatment,
+            )
+            try:
+                await asyncio.to_thread(repo.add_purchase_order, purchase_order)
+            except sqlite3.IntegrityError as exc:
+                raise HTTPException(status_code=409, detail="that purchase-order number already exists") from exc
+            payload["created_purchase_order"] = purchase_order.model_dump(mode="json")
+            resolution_status = "REFERENCE_ADDED"
+
+        elif action == "select_purchase_order":
+            if not request.selected_po_id:
+                raise HTTPException(status_code=422, detail="select a purchase order")
+            if request.selected_po_id not in {order.po_id for order in repo.get_purchase_orders()}:
+                raise HTTPException(status_code=422, detail="the selected purchase order no longer exists")
+            resolution_status = "MATCH_ASSIGNED"
+
+        elif action in {"approve_exception", "mark_distinct"}:
+            resolution_status = "CLOSED"
+        elif action in {"reject_invoice", "confirm_duplicate"}:
+            existing = run["decision"]
+            rejected = Decision(
+                outcome="REJECT",
+                reason_codes=[*existing.get("reason_codes", []), "MANUAL_REJECTION"],
+                explanation=f"{existing.get('explanation', 'Invoice needs review.')} Human resolution: {action.replace('_', ' ')}.",
+                evidence=existing.get("evidence", []),
+            )
+            await asyncio.to_thread(repo.set_run_decision, run_id, rejected)
+            resolution_status = "CLOSED"
+        elif action == "archive_invoice":
+            resolution_status = "ARCHIVED"
+        elif action == "hold_for_procurement":
+            resolution_status = "ON_HOLD"
+        elif action == "correct_fields":
+            if not request.corrected_fields:
+                raise HTTPException(status_code=422, detail="enter at least one corrected field")
+            resolution_status = "CORRECTION_RECORDED"
+
+        resolution = await asyncio.to_thread(
+            repo.set_exception_resolution, run_id, resolution_status, action, request.note, payload
+        )
+        await asyncio.to_thread(
+            repo.append_stage,
+            run_id,
+            "exception_resolution",
+            {"action": action, "status": resolution_status, "note": request.note, "payload": payload},
+        )
+        return {"resolution": resolution, "run": repo.get_run(run_id)}
 
     @app.get("/api/runs/{run_id}/events")
     async def run_events(run_id: str) -> StreamingResponse:

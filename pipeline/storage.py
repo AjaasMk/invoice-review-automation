@@ -56,6 +56,14 @@ CREATE TABLE IF NOT EXISTS email_intake_records (
     created_at TEXT NOT NULL,
     PRIMARY KEY (message_key, content_sha256)
 );
+CREATE TABLE IF NOT EXISTS exception_resolutions (
+    run_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    action TEXT NOT NULL,
+    note TEXT,
+    payload_json TEXT NOT NULL,
+    resolved_at TEXT NOT NULL
+);
 """
 
 
@@ -137,6 +145,28 @@ class Repository:
         with self._connect() as conn:
             conn.execute("UPDATE purchase_orders SET invoiced_to_date = ? WHERE po_id = ?", (str(new_invoiced_to_date), po_id))
 
+    def add_vendor(self, vendor: VendorRecord) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO vendors (vendor_id, canonical_name, aliases_json, approved) VALUES (?, ?, ?, ?)",
+                (vendor.vendor_id, vendor.canonical_name, json.dumps(vendor.aliases), int(vendor.approved)),
+            )
+
+    def add_purchase_order(self, purchase_order: PurchaseOrder) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO purchase_orders (po_id, vendor_id, amount, currency, issued_date, tax_treatment, invoiced_to_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    purchase_order.po_id,
+                    purchase_order.vendor_id,
+                    str(purchase_order.amount),
+                    purchase_order.currency,
+                    purchase_order.issued_date.isoformat(),
+                    purchase_order.tax_treatment,
+                    str(purchase_order.invoiced_to_date),
+                ),
+            )
+
     def update_po_balance_if_current(
         self,
         po_id: str,
@@ -191,6 +221,7 @@ class Repository:
             conn.execute("DELETE FROM run_stages")
             conn.execute("DELETE FROM invoice_records")
             conn.execute("DELETE FROM email_intake_records")
+            conn.execute("DELETE FROM exception_resolutions")
             conn.execute("DELETE FROM runs")
             conn.execute("UPDATE purchase_orders SET invoiced_to_date = '0'")
         return {"runs_cleared": run_count, "invoice_records_cleared": invoice_count}
@@ -214,6 +245,28 @@ class Repository:
                 "UPDATE runs SET decision_json = ?, updated_at = ? WHERE run_id = ?",
                 (decision.model_dump_json(), _now_iso(), run_id),
             )
+
+    def set_exception_resolution(self, run_id: str, status: str, action: str, note: str | None, payload: dict) -> dict:
+        """Persist the latest exception state; append_stage keeps the full action history."""
+        record = {
+            "status": status,
+            "action": action,
+            "note": note or None,
+            "payload": payload,
+            "resolved_at": _now_iso(),
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO exception_resolutions (run_id, status, action, note, payload_json, resolved_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    status = excluded.status, action = excluded.action, note = excluded.note,
+                    payload_json = excluded.payload_json, resolved_at = excluded.resolved_at
+                """,
+                (run_id, record["status"], record["action"], record["note"], json.dumps(record["payload"], default=str), record["resolved_at"]),
+            )
+        return record
 
     def append_stage(self, run_id: str, stage: str, payload: dict) -> int:
         with self._connect() as conn:
@@ -252,6 +305,15 @@ class Repository:
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }
+        resolution_row = conn.execute("SELECT * FROM exception_resolutions WHERE run_id = ?", (row["run_id"],)).fetchone()
+        if resolution_row is not None:
+            result["resolution"] = {
+                "status": resolution_row["status"],
+                "action": resolution_row["action"],
+                "note": resolution_row["note"],
+                "payload": json.loads(resolution_row["payload_json"]),
+                "resolved_at": resolution_row["resolved_at"],
+            }
         for stage_name in ("intake", "validate"):
             stage_row = conn.execute(
                 "SELECT payload_json FROM run_stages WHERE run_id = ? AND stage = ? ORDER BY seq DESC LIMIT 1",
