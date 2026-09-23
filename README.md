@@ -4,6 +4,16 @@ An end-to-end invoice processing pipeline: an invoice arrives (email, folder dro
 
 Design rationale and architecture: [`docs/superpowers/specs/2026-09-20-invoice-decision-pipeline-design.md`](docs/superpowers/specs/2026-09-20-invoice-decision-pipeline-design.md).
 
+## Current status
+
+- **Application:** FastAPI service with a responsive review workspace, live stage updates, run history, vendor/PO database view, and a development-only reset control.
+- **Intake:** Manual upload, watched-folder intake, and Gmail IMAP intake are implemented. Gmail processing is deliberately restricted to messages labelled `Invoice Review Queue`; an employee applies that label before the system reads the attachment.
+- **Controls:** Structured extraction is separated from deterministic validation, vendor/PO matching, cumulative PO-balance checks, and duplicate detection. Exact file duplicates are stopped before model processing; content-level duplicates are routed to review with an explanation.
+- **Demo data:** Five vendors, twenty purchase orders, regression fixtures, and three DB-matched demo invoices are included.
+- **Deployment:** Docker packaging and a Railway deployment guide are ready. The source is published in the private [GitHub repository](https://github.com/AjaasMk/invoice-review-automation); Railway connection and public-domain verification are the remaining release steps.
+
+GitHub Actions workflow suggestions can be ignored for this project. They are generic package/lint templates; Railway builds and runs the included `Dockerfile` directly.
+
 ## Setup
 
 ```bash
@@ -19,7 +29,7 @@ Edit `.env` — the model reads the invoice; it never decides approve/reject:
 - `ANTHROPIC_API_KEY` — for the Claude-backed clients.
 - `NVIDIA_API_KEY` + `NVIDIA_MODEL` — optional fallback using NVIDIA's OpenAI-compatible endpoint at `integrate.api.nvidia.com`.
 - `GMAIL_IMAP_USER` / `GMAIL_IMAP_APP_PASSWORD` — optional. Leave blank to run on folder/upload intake only. If set, needs a Gmail [App Password](https://myaccount.google.com/apppasswords) (requires 2-Step Verification), not the account password.
-- `GMAIL_IMAP_MAILBOX` — defaults to `INBOX`. For a low-noise workflow, create a Gmail label named `Invoice Review Queue`, route trusted invoice emails to it with a Gmail filter, and set this value to that exact label name. The app will poll only that label.
+- `GMAIL_IMAP_MAILBOX` — defaults to `INBOX`. For the review workflow, create a Gmail label named `Invoice Review Queue`, set this value to that exact label name, and have an employee apply it to invoice mail. The app polls only that label, including messages that have already been read.
 
 Generate the test fixtures (happy path + all 4 edge cases) if `data/invoices/` is empty:
 
@@ -35,10 +45,12 @@ python -m web.server
 
 No API key handy? `python preview_server.py` runs the same UI on fake extraction/triage clients (port 8123) so you can check layout and flow without spending a real call.
 
-Open `http://localhost:8000`. Three tabs:
-- **Gate** — drag an invoice in (or drop a file into `runs/inbox/`, or send one to the configured Gmail inbox if IMAP is on) and approve/reject it.
+Open `http://localhost:8000`. The workspace includes:
+- **Inbox** — upload a PDF/image or monitor the configured Gmail label and watched folder.
+- **Review Queue** — approve/reject incoming documents before they consume an extraction call.
 - **Live Run** — watch each pipeline stage move from started to completed (or failed) over SSE as it executes.
-- **Dashboard** — filterable history with invoice, vendor, amount, status, decision, and reason codes; click a row to reopen its full trace.
+- **Invoices** — filterable history with invoice, vendor, amount, status, decision, and reason codes; click a row to reopen its full trace.
+- **Live database** — inspect the five vendors and twenty purchase orders used by matching.
 
 ## Verify it
 
@@ -72,6 +84,7 @@ Every incoming attachment also receives a SHA-256 fingerprint. An exact re-uploa
 
 - Docker/cloud-host instructions: [`docs/deployment.md`](docs/deployment.md)
 - Five-minute recording and interview sequence: [`docs/demo-runbook.md`](docs/demo-runbook.md)
+- Railway release checklist: create one service from this repository, attach a persistent volume at `/app/runs`, set health check `/api/health`, add the model/Gmail values as Railway secrets, and generate a public domain. Keep one replica because SQLite is used for the demo database.
 
 ## Edge cases (all verified in `evals/run_evals.py`)
 
