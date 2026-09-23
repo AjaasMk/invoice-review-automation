@@ -326,7 +326,7 @@ $("upload-form").addEventListener("submit",async event => {
 });
 $("confirm-reset").addEventListener("click",async () => {
   $("confirm-reset").disabled=true;$("reset-message").textContent="Resetting development data…";
-  try {await api("/api/demo/reset?confirm=true",{method:"POST"});$("reset-dialog").close();$("detail-dialog").close();state.detailId=null;state.stream?.close();await refresh();toast("Demo history cleared and PO balances reset.");$("reset-message").textContent="";}
+  try {const token = $("reset-token").value;await api("/api/demo/reset?confirm=true",{method:"POST",headers:token ? {"X-Demo-Reset-Token":token} : {}});$("reset-dialog").close();$("detail-dialog").close();state.detailId=null;state.stream?.close();$("reset-token").value="";await refresh();toast("Demo history cleared and PO balances reset.");$("reset-message").textContent="";}
   catch(error){$("reset-message").textContent=error.message;}
   finally{$("confirm-reset").disabled=false;}
 });

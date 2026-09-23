@@ -27,6 +27,7 @@ Edit `.env` — the DeepSeek model reads the invoice; it never decides approve/r
 - `LLM_PROVIDER=deepseek`
 - `DEEPSEEK_API_KEY` — your DeepSeek API key.
 - `DEEPSEEK_MODEL=deepseek-flash` — used for text PDFs and rendered scanned/image invoices.
+- `DEMO_RESET_TOKEN` — leave blank locally. Set a strong private value in Railway; enter it in the Settings reset dialog only when you want to reset the hosted demo.
 - `GMAIL_IMAP_USER` / `GMAIL_IMAP_APP_PASSWORD` — optional. Leave blank to run on folder/upload intake only. If set, needs a Gmail [App Password](https://myaccount.google.com/apppasswords) (requires 2-Step Verification), not the account password.
 - `GMAIL_IMAP_MAILBOX` — defaults to `INBOX`. For the review workflow, create a Gmail label named `Invoice Review Queue`, set this value to that exact label name, and have an employee apply it to invoice mail. The app polls only that label, including messages that have already been read.
 

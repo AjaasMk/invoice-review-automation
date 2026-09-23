@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import secrets
 import sqlite3
 import uuid
 from contextlib import asynccontextmanager
@@ -10,7 +11,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -154,9 +155,12 @@ def create_app(
         }
 
     @app.post("/api/demo/reset")
-    async def reset_demo_state(confirm: bool = False) -> dict:
+    async def reset_demo_state(confirm: bool = False, x_demo_reset_token: str | None = Header(default=None)) -> dict:
         if not confirm:
             raise HTTPException(status_code=400, detail="set confirm=true to reset the demo state")
+        expected_reset_token = os.environ.get("DEMO_RESET_TOKEN")
+        if expected_reset_token and not secrets.compare_digest(x_demo_reset_token or "", expected_reset_token):
+            raise HTTPException(status_code=403, detail="a valid demo reset token is required")
         async with app.state.state_lock:
             summary = await asyncio.to_thread(repo.reset_demo_state)
             await asyncio.to_thread(_clear_checkpoints, checkpoint_db_path)
