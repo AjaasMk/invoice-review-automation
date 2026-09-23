@@ -214,6 +214,7 @@ function exceptionActions(run) {
   if (["DUPLICATE_SUSPECTED", "EXACT_FILE_DUPLICATE"].some(reason => reasons.has(reason))) { add("confirm_duplicate", "Confirm duplicate", true); add("mark_distinct", "Mark distinct"); }
   if (["LOW_EXTRACTION_CONFIDENCE", "MISSING_REQUIRED_FIELD"].some(reason => reasons.has(reason))) add("correct_fields", "Correct fields", true);
   if (["AMOUNT_OVER_TOLERANCE", "PO_BALANCE_EXCEEDED", "CONCURRENT_PO_UPDATE"].some(reason => reasons.has(reason))) { add("approve_exception", "Approve exception", true); add("hold_for_procurement", "Hold for procurement"); }
+  if (["REFERENCE_ADDED", "MATCH_ASSIGNED", "CORRECTION_RECORDED", "OPEN"].includes(run.resolution?.status)) add("recheck_invoice", "Re-check invoice", true);
   add("reject_invoice", "Reject invoice");
   add("archive_invoice", "Archive");
   return `<section class="exception-actions"><h3>Resolve exception</h3><p>Choose an action. Ledger records the original automated finding and your human resolution.</p><div class="drawer-actions">${actions.join("")}</div></section>`;

@@ -21,7 +21,10 @@ from pipeline.intake.folder_source import FolderSource
 from pipeline.intake.imap_source import ImapSource
 from pipeline.intake.upload_source import UploadSource
 from pipeline.storage import Repository
-from pipeline.schemas import Decision, PurchaseOrder, VendorRecord
+from pipeline.schemas import Decision, Invoice, PurchaseOrder, VendorRecord
+from pipeline.decision import decide
+from pipeline.po_match import match_po
+from pipeline.vendor_resolve import resolve_vendor
 
 logger = logging.getLogger("invoice_pipeline.web")
 SUPPORTED_UPLOAD_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg"}
@@ -32,7 +35,7 @@ class ExceptionResolutionRequest(BaseModel):
     action: Literal[
         "add_vendor", "create_purchase_order", "select_purchase_order", "correct_fields",
         "approve_exception", "reject_invoice", "archive_invoice", "hold_for_procurement",
-        "confirm_duplicate", "mark_distinct",
+        "confirm_duplicate", "mark_distinct", "recheck_invoice",
     ]
     note: str | None = Field(default=None, max_length=1000)
     vendor_name: str | None = Field(default=None, max_length=200)
@@ -263,6 +266,50 @@ def create_app(
                 raise HTTPException(status_code=422, detail="the selected purchase order no longer exists")
             resolution_status = "MATCH_ASSIGNED"
 
+        elif action == "correct_fields":
+            latest_invoice_payload = next(
+                (stage["payload"] for stage in reversed(repo.get_stages(run_id)) if stage["stage"] in {"manual_correction", "validate"}),
+                None,
+            )
+            if latest_invoice_payload is None:
+                raise HTTPException(status_code=409, detail="this run has no extracted invoice fields to correct")
+            if not request.corrected_fields:
+                raise HTTPException(status_code=422, detail="enter at least one corrected field")
+            corrected_invoice = Invoice.model_validate({**latest_invoice_payload, **request.corrected_fields})
+            payload["corrected_invoice"] = corrected_invoice.model_dump(mode="json")
+            await asyncio.to_thread(repo.append_stage, run_id, "manual_correction", payload["corrected_invoice"])
+            resolution_status = "CORRECTION_RECORDED"
+
+        elif action == "recheck_invoice":
+            latest_invoice_payload = next(
+                (stage["payload"] for stage in reversed(repo.get_stages(run_id)) if stage["stage"] in {"manual_correction", "validate"}),
+                None,
+            )
+            if latest_invoice_payload is None:
+                raise HTTPException(status_code=409, detail="this run has no extracted invoice fields to re-check")
+            invoice = Invoice.model_validate(latest_invoice_payload)
+            vendor = resolve_vendor(invoice.vendor_name_raw, repo.get_vendors())
+            prior_invoices = repo.get_prior_invoices(vendor.vendor_id, run_id) if vendor else []
+            match = match_po(invoice, vendor, repo.get_purchase_orders(), prior_invoices)
+            decision = decide(invoice, match)
+            if decision.outcome == "AUTO_APPROVE" and match.po is not None and match.comparison_amount is not None:
+                new_balance = match.po.invoiced_to_date + match.comparison_amount
+                if not repo.update_po_balance_if_current(match.po.po_id, match.po.invoiced_to_date, new_balance):
+                    decision = Decision(
+                        outcome="NEEDS_REVIEW",
+                        reason_codes=["CONCURRENT_PO_UPDATE"],
+                        explanation="The PO balance changed while this invoice was being re-checked; review it again.",
+                        evidence=match.evidence,
+                    )
+                elif vendor is not None:
+                    repo.save_invoice_record(run_id, vendor.vendor_id, invoice)
+            await asyncio.to_thread(repo.append_stage, run_id, "manual_vendor_resolve", {"vendor": vendor.model_dump(mode="json") if vendor else None})
+            await asyncio.to_thread(repo.append_stage, run_id, "manual_po_match", match.model_dump(mode="json"))
+            await asyncio.to_thread(repo.append_stage, run_id, "manual_decide", decision.model_dump(mode="json"))
+            await asyncio.to_thread(repo.set_run_decision, run_id, decision)
+            payload["rechecked_outcome"] = decision.outcome
+            resolution_status = "CLOSED" if decision.outcome != "NEEDS_REVIEW" else "OPEN"
+
         elif action in {"approve_exception", "mark_distinct"}:
             resolution_status = "CLOSED"
         elif action in {"reject_invoice", "confirm_duplicate"}:
@@ -279,10 +326,6 @@ def create_app(
             resolution_status = "ARCHIVED"
         elif action == "hold_for_procurement":
             resolution_status = "ON_HOLD"
-        elif action == "correct_fields":
-            if not request.corrected_fields:
-                raise HTTPException(status_code=422, detail="enter at least one corrected field")
-            resolution_status = "CORRECTION_RECORDED"
 
         resolution = await asyncio.to_thread(
             repo.set_exception_resolution, run_id, resolution_status, action, request.note, payload
