@@ -153,7 +153,9 @@ async function refresh() {
     if (state.detailId && $("detail-dialog").open) await loadDetail(false);
   } catch (error) {
     $("connection-state").textContent = "Connection interrupted";
-    $("connection-error").innerHTML = `Could not refresh the workspace. ${state.loaded ? "Showing the last saved view." : "Check that the server is running."} <button data-action="refresh">Retry</button>`;
+    $("connection-error").innerHTML = location.protocol === "file:"
+      ? "This page was opened as a file, so it can’t reach the workspace. Run <code>python -m web.server</code> and open http://localhost:8000."
+      : `Could not refresh the workspace. ${state.loaded ? "Showing the last saved view." : "Check that the server is running."} <button data-action="refresh">Retry</button>`;
     $("connection-error").hidden = false;
   } finally { state.refreshing = false; }
 }
