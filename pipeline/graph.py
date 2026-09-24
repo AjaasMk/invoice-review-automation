@@ -14,7 +14,7 @@ from pipeline.normalize import normalize_invoice
 from pipeline.po_match import match_po
 from pipeline.schemas import Decision, IncomingDocument, Invoice, MatchResult, TriageResult, VendorRecord
 from pipeline.storage import Repository
-from pipeline.triage import TriageClient, run_triage
+from pipeline.triage import TriageClient
 from pipeline.validate import validate_invoice
 from pipeline.vendor_resolve import resolve_vendor
 
@@ -52,7 +52,15 @@ def build_graph(
 
     def node_triage(state: GraphState) -> dict:
         started(state["run_id"], "triage")
-        triage_result = run_triage(state["document"].content_path, triage_client)
+        # Intake is deliberately human-first. Gmail items have already been put in
+        # the review label by an employee, and uploads/folder items pause at the
+        # same gate. Calling the vision model here and again after approval made
+        # a scanned invoice pay for two serial AI requests with no added control.
+        triage_result = TriageResult(
+            looks_like_invoice=True,
+            preview_text="Attachment received and ready for human intake review.",
+            reason="AI extraction begins only after a reviewer approves this item.",
+        )
         record(state["run_id"], "triage", triage_result.model_dump())
         return {"triage": triage_result}
 

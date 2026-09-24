@@ -12,8 +12,10 @@
 
   const VIEW_WIDTH = 500;
   const VIEW_HEIGHT = 340;
-  const GRID = 6;
-  const FRAME_MS = 40;
+  // This is a decorative background, not a real-time simulation. A sparse,
+  // low-frequency redraw keeps page navigation responsive on ordinary laptops.
+  const GRID = 8;
+  const FRAME_MS = 160;
   const EDGE_FADE = 24;
   const SPREAD = {cx: 250, cy: 170, left: 320, right: 230, ry: 250, reach: 1.02, softness: 0.55};
   const LETTER = [[118, 128, 151, 272], [118, 239, 235, 272]];
