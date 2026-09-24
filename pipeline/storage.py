@@ -70,16 +70,26 @@ CREATE TABLE IF NOT EXISTS exception_resolutions (
 class Repository:
     def __init__(self, db_path: str) -> None:
         self._db_path = db_path
+        self._conn: sqlite3.Connection | None = None
+
+    def _get_connection(self) -> sqlite3.Connection:
+        if self._conn is None:
+            conn = sqlite3.connect(self._db_path, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn = conn
+        return self._conn
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
-        conn = sqlite3.connect(self._db_path)
-        conn.row_factory = sqlite3.Row
+        conn = self._get_connection()
         try:
             yield conn
             conn.commit()
-        finally:
-            conn.close()
+        except Exception:
+            conn.rollback()
+            raise
 
     def init_db(self) -> None:
         with self._connect() as conn:
