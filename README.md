@@ -10,10 +10,6 @@ Ledger turns invoice files into clear, explainable review decisions.
 
 The AI only reads invoice data. The approval decision is made by fixed, visible rules, so every result can be explained.
 
-## Live demo
-
-The deployed demo is available at [invoice-review-automation-production.up.railway.app](https://invoice-review-automation-production.up.railway.app).
-
 ## Run locally
 
 You need Python 3.11 or newer.
